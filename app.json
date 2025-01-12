@@ -1,0 +1,51 @@
+{
+  "expo": {
+    "name": "PrimeLogistique",
+    "slug": "PrimeLogistique",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/Log.png",
+    "scheme": "myapp",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/images/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#001933"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        }
+      },
+      "bundleIdentifier": "com.primelogistique.app"
+    },
+    "android": {
+      "package": "com.primelogistique.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/Log.png",
+        "backgroundColor": "#001933"
+      }
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "fallback": true,
+      "favicon": "./assets/images/Log.png"
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "newArchEnabled": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "48653080-55ff-45fb-b641-f0ba66a15f0e"
+      }
+    },
+    "owner": "ouafid"
+  }
+}

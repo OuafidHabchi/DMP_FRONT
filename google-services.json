@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "71441574024",
+    "project_id": "primelogistiquemessenger",
+    "storage_bucket": "primelogistiquemessenger.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:71441574024:android:3886913bfa516bd8f1973d",
+        "android_client_info": {
+          "package_name": "com.primelogistique.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDKmKttHct_Dk3T3Rmy4aYxOmMkzOo2DlE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
