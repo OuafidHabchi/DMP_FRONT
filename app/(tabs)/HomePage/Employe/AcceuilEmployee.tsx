@@ -3,8 +3,6 @@ import { StyleSheet, Text, View, ScrollView, RefreshControl, Alert, Animated, Mo
 import { useRoute } from '@react-navigation/native';
 import axios from 'axios';
 import Icon from 'react-native-vector-icons/FontAwesome'; // Import of icons
-import QRCode from 'react-native-qrcode-svg';
-import { Pressable } from 'react-native';
 import AppURL from '@/components/src/URL';
 
 
@@ -40,18 +38,8 @@ type Disponibility = {
   decisions?: 'accepted' | 'rejected';
   confirmation?: 'pending' | 'confirmed' | 'rejected' | 'canceled';
   presence?: string | null;
+  suspension?: string
 };
-type Van = {
-  _id: string;
-  vehicleNumber: string;
-  model: string;
-  type: string;
-  geotab: string;
-  vin: string;
-};
-
-// API URL
-
 
 // Utility function to get the start of the week (Sunday)
 const getStartOfWeek = (date: Date) => {
@@ -251,15 +239,19 @@ const AcceuilEmployee = () => {
                     {renderPresenceIcon(dispo.presence ?? undefined)}
 
                     <View style={styles.shiftDetails}>
+                      
+                      {dispo.suspension && (
+                        <Text style={styles.suspensionIndicator}>
+                          ⚠️ {user.language === 'English' ? 'Sus' : 'Sus'}
+                        </Text>
+                      )}
+
                       <Text style={[styles.shiftName, textDecorationStyle]}>
                         {shift?.name}
                         {dispo.confirmation === 'canceled' && <Text style={styles.canceledText}>({user.language === 'English' ? 'Canceled' : 'Annulé'})</Text>}
                       </Text>
                       <Text style={[styles.shiftstarttime, textDecorationStyle]}>
                         {user.language === 'English' ? 'Start Time' : 'Heure de début'}: {shift?.starttime}
-                      </Text>
-                      <Text style={[styles.shiftendtime, textDecorationStyle]}>
-                        {user.language === 'English' ? 'End Time' : 'Heure de fin'}: {shift?.endtime}
                       </Text>
                       <Text style={[styles.shiftDate, textDecorationStyle]}>
                         {user.language === 'English' ? 'Date' : 'Date'}: {new Date(dispo.selectedDay).toLocaleDateString()}
@@ -311,7 +303,11 @@ const AcceuilEmployee = () => {
                   >
                     {/* Confirmation ou icône de rejet */}
                     {renderPresenceIcon(dispo.presence ?? undefined)}
-
+                    {dispo.suspension && (
+                        <Text style={styles.suspensionIndicator}>
+                          ⚠️ {user.language === 'English' ? 'Sus' : 'Sus'}
+                        </Text>
+                      )}
                     <View style={styles.shiftDetails}>
                       {/* Disposition en ligne pour le texte barré et le mot "Canceled" */}
                       <View style={styles.shiftRow}>
@@ -327,9 +323,7 @@ const AcceuilEmployee = () => {
                       <Text style={[styles.shiftstarttime, dispo.confirmation === 'canceled' ? styles.strikeThroughText : null]}>
                         {user.language === 'English' ? 'Start Time' : 'Heure de début'}: {shift?.starttime}
                       </Text>
-                      <Text style={[styles.shiftendtime, dispo.confirmation === 'canceled' ? styles.strikeThroughText : null]}>
-                        {user.language === 'English' ? 'End Time' : 'Heure de fin'}: {shift?.endtime}
-                      </Text>
+                    
                       <Text style={[styles.shiftDate, dispo.confirmation === 'canceled' ? styles.strikeThroughText : null]}>
                         {user.language === 'English' ? 'Date' : 'Date'}: {new Date(dispo.selectedDay).toLocaleDateString()}
                       </Text>
@@ -401,7 +395,12 @@ const AcceuilEmployee = () => {
 export default AcceuilEmployee;
 
 const styles = StyleSheet.create({
-
+  suspensionIndicator: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: 'red',
+    marginBottom: 5,
+  },
   container: {
     flex: 1,
     padding: 16,

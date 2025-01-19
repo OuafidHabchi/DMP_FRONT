@@ -362,8 +362,8 @@ const Disponibilities = () => {
 
                       <Text style={styles.buttonText}>
                         {user.language === 'English'
-                          ? `Start Time: ${shift.starttime} End Time: ${shift.endtime}`
-                          : `Heure de début: ${shift.starttime} Heure de fin: ${shift.endtime}`}
+                          ? `Start Time: ${shift.starttime}`
+                          : `Heure de début: ${shift.starttime}`}
                       </Text>
                     </Pressable>
                   ))

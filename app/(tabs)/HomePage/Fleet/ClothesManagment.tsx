@@ -15,6 +15,8 @@ import axios from 'axios';
 import { useRoute } from '@react-navigation/native';
 import { Picker } from '@react-native-picker/picker';
 import { MaterialIcons } from '@expo/vector-icons';
+import AppURL from '@/components/src/URL';
+
 
 
 // Define types
@@ -56,9 +58,6 @@ interface Assignment {
   createdBy: string;
 }
 
-const URL_Employee = 'https://coral-app-wqv9l.ondigitalocean.app';
-const URL_Clothes = 'https://coral-app-wqv9l.ondigitalocean.app';
-const URL_Assignments = 'https://coral-app-wqv9l.ondigitalocean.app';
 
 const ClothesManagement: React.FC = () => {
   const route = useRoute();
@@ -71,7 +70,6 @@ const ClothesManagement: React.FC = () => {
   const [clothes, setClothes] = useState<Clothes[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
-
   // Modal visibility states
   const [isClothesModalVisible, setClothesModalVisible] = useState(false);
   const [isAddClothesModalVisible, setAddClothesModalVisible] = useState(false);
@@ -85,6 +83,9 @@ const ClothesManagement: React.FC = () => {
   const [isStockModalVisible, setStockModalVisible] = useState(false);
   // Form state for adding clothes
   const [newClothes, setNewClothes] = useState({ type: '', size: '', quantite: 0 });
+  const [isPickerModalVisible, setPickerModalVisible] = useState(false);
+
+
 
   // Load data on component mount
   useEffect(() => {
@@ -95,7 +96,7 @@ const ClothesManagement: React.FC = () => {
 
   const fetchAllAssignments = async () => {
     try {
-      const response = await axios.get<Assignment[]>(`${URL_Assignments}/api/clothesAssignment/assignments`, {
+      const response = await axios.get<Assignment[]>(`${AppURL}/api/clothesAssignment/assignments`, {
         params: { dsp_code: user.dsp_code }, // Ajout de dsp_code
       });
       setAssignments(response.data);
@@ -103,11 +104,11 @@ const ClothesManagement: React.FC = () => {
       console.error("Erreur lors du chargement des assignations :", error);
     }
   };
-  
+
 
   const fetchEmployees = async () => {
     try {
-      const response = await axios.get<Employee[]>(`${URL_Employee}/api/employee`, {
+      const response = await axios.get<Employee[]>(`${AppURL}/api/employee`, {
         params: { dsp_code: user.dsp_code }, // Ajout de dsp_code
       });
       setEmployees(response.data);
@@ -116,11 +117,11 @@ const ClothesManagement: React.FC = () => {
       console.error('Erreur lors du chargement des employés :', error);
     }
   };
-  
+
 
   const fetchClothes = async () => {
     try {
-      const response = await axios.get<Clothes[]>(`${URL_Clothes}/api/clothes/clothes`, {
+      const response = await axios.get<Clothes[]>(`${AppURL}/api/clothes/clothes`, {
         params: { dsp_code: user.dsp_code }, // Ajout de dsp_code
       });
       setClothes(response.data);
@@ -128,11 +129,11 @@ const ClothesManagement: React.FC = () => {
       console.error('Erreur lors du chargement des vêtements :', error);
     }
   };
-  
+
 
   const fetchAssignments = async (employeeId: string) => {
     try {
-      const response = await axios.get<Assignment[]>(`${URL_Assignments}/api/clothesAssignment/assignments`, {
+      const response = await axios.get<Assignment[]>(`${AppURL}/api/clothesAssignment/assignments`, {
         params: {
           dsp_code: user.dsp_code, // Ajout de dsp_code
         },
@@ -145,7 +146,7 @@ const ClothesManagement: React.FC = () => {
       console.error('Erreur lors du chargement des assignations :', error);
     }
   };
-  
+
 
 
   const handleSearch = (text: string) => {
@@ -161,12 +162,31 @@ const ClothesManagement: React.FC = () => {
     }
   };
 
-  const toggleClothesModal = () => setClothesModalVisible(!isClothesModalVisible);
+  const closeAllModals = () => {
+    setClothesModalVisible(false);
+    setAddClothesModalVisible(false);
+    setAssignmentModalVisible(false);
+    setAddAssignmentModalVisible(false);
+    setEditDeleteModalVisible(false);
+    setStockModalVisible(false);
+  };
 
-  const openAddClothesModal = () => setAddClothesModalVisible(true);
-  const closeAddClothesModal = () => setAddClothesModalVisible(false);
+
+  const toggleClothesModal = () => {
+    closeAllModals();
+    setClothesModalVisible(!isClothesModalVisible);
+  };
+
+  const openAddClothesModal = () => {
+    closeAllModals();
+    setAddClothesModalVisible(true);
+  };
+  const closeAddClothesModal = () => {
+    closeAllModals();
+  };
 
   const openEditDeleteModal = (clothes: Clothes) => {
+    closeAllModals();
     setSelectedClothes(clothes); // Définit le vêtement sélectionné
     setEditDeleteModalVisible(true); // Ouvre le modal contextuel
   };
@@ -177,29 +197,37 @@ const ClothesManagement: React.FC = () => {
   };
 
   const openAssignmentModal = (employee: Employee) => {
+    closeAllModals();
     setSelectedEmployee(employee);
     fetchAssignments(employee._id);
     setAssignmentModalVisible(true);
   };
+
 
   const closeAssignmentModal = () => {
     setSelectedEmployee(null);
     setAssignmentModalVisible(false);
   };
 
-  const openAddAssignmentModal = () => setAddAssignmentModalVisible(true);
+  const openAddAssignmentModal = () => {
+    closeAllModals();
+    setAddAssignmentModalVisible(true);
+  };
 
   const closeAddAssignmentModal = () => {
     setSelectedClothesType(null); // Réinitialise la sélection
     setAddAssignmentModalVisible(false);
   };
 
-  const openStockModal = () => setStockModalVisible(true);
+  const openStockModal = () => {
+    closeAllModals();
+    setStockModalVisible(true);
+  };
   const closeStockModal = () => setStockModalVisible(false);
 
   const addNewClothes = async () => {
     try {
-      const response = await axios.post(`${URL_Clothes}/api/clothes/clothes`, {
+      const response = await axios.post(`${AppURL}/api/clothes/clothes`, {
         ...newClothes,
         dsp_code: user.dsp_code, // Ajout de dsp_code
         date: new Date().toISOString(),
@@ -212,11 +240,11 @@ const ClothesManagement: React.FC = () => {
       console.error('Erreur lors de la création du vêtement :', error);
     }
   };
-  
+
 
   const updateClothes = async (id: string, updatedData: Partial<Clothes>) => {
     try {
-      const response = await axios.put(`${URL_Clothes}/api/clothes/clothes/${id}`, {
+      const response = await axios.put(`${AppURL}/api/clothes/clothes/${id}`, {
         ...updatedData,
         dsp_code: user.dsp_code, // Ajout de dsp_code
       });
@@ -227,10 +255,10 @@ const ClothesManagement: React.FC = () => {
     }
   };
 
-  
+
   const deleteClothes = async (id: string) => {
     try {
-      await axios.delete(`${URL_Clothes}/api/clothes/clothes/${id}`, {
+      await axios.delete(`${AppURL}/api/clothes/clothes/${id}`, {
         params: { dsp_code: user.dsp_code }, // Ajout de dsp_code
       });
       console.log('Vêtement supprimé.');
@@ -240,10 +268,10 @@ const ClothesManagement: React.FC = () => {
     }
   };
 
-  
+
   const addNewAssignment = async (assignmentData: Partial<Assignment>) => {
     try {
-      const response = await axios.post(`${URL_Assignments}/api/clothesAssignment/assignments`, {
+      const response = await axios.post(`${AppURL}/api/clothesAssignment/assignments`, {
         ...assignmentData,
         dsp_code: user.dsp_code, // Ajout de dsp_code
         createdBy: user._id, // ID de l'utilisateur connecté
@@ -256,10 +284,10 @@ const ClothesManagement: React.FC = () => {
     }
   };
 
-  
+
   const deleteAssignment = async (id: string) => {
     try {
-      await axios.delete(`${URL_Assignments}/api/clothesAssignment/assignments/${id}`, {
+      await axios.delete(`${AppURL}/api/clothesAssignment/assignments/${id}`, {
         params: { dsp_code: user.dsp_code }, // Ajout de dsp_code
       });
       console.log('Assignation supprimée.');
@@ -268,7 +296,7 @@ const ClothesManagement: React.FC = () => {
       console.error('Erreur lors de la suppression de l\'assignation :', error);
     }
   };
-  
+
 
   const getClothesDetails = (clothesId: string) => {
     return clothes.find((clothing) => clothing._id === clothesId);
@@ -502,8 +530,20 @@ const ClothesManagement: React.FC = () => {
 
       {/* Assignments modal */}
       <Modal visible={isAssignmentModalVisible} animationType="fade" transparent>
-        <View style={Platform.OS === 'web' ? styles.assignmentModalBackdropWeb : styles.assignmentModalBackdrop}>
-          <View style={Platform.OS === 'web' ? styles.assignmentModalContainerWeb : styles.assignmentModalContainer}>
+        <View
+          style={
+            Platform.OS === 'web'
+              ? styles.assignmentModalBackdropWeb
+              : styles.assignmentModalBackdrop
+          }
+        >
+          <View
+            style={
+              Platform.OS === 'web'
+                ? styles.assignmentModalContainerWeb
+                : styles.assignmentModalContainer
+            }
+          >
             <Text style={styles.assignmentModalTitle}>
               {user.language === 'English'
                 ? `Clothes Given to ${selectedEmployee?.name}`
@@ -515,22 +555,38 @@ const ClothesManagement: React.FC = () => {
               keyExtractor={(item) => item._id}
               renderItem={({ item }) => (
                 <View style={styles.assignmentModalItem}>
-                  <View>
+                  <View style={styles.assignmentModalTextContainer}>
                     <Text style={styles.assignmentModalItemText}>
                       {user.language === 'English'
                         ? `Type: ${getClothesDetails(item.clothesId)?.type || 'N/A'}`
                         : `Type: ${getClothesDetails(item.clothesId)?.type || 'Non disponible'}`}
                     </Text>
                     <Text style={styles.assignmentModalItemText}>
-                      {user.language === 'English' ? `Quantity: ${item.quantite}` : `Quantité: ${item.quantite}`}
+                      {user.language === 'English'
+                        ? `Quantity: ${item.quantite}`
+                        : `Quantité: ${item.quantite}`}
+                    </Text>
+                    <Text
+                      style={styles.assignmentModalItemText}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
+                      {user.language === 'English'
+                        ? `Given by: ${employees.find((employee) => employee._id === item.createdBy)?.name ||
+                        'Unknown'
+                        } ${employees.find((employee) => employee._id === item.createdBy)
+                          ?.familyName || ''
+                        }`
+                        : `Donné par: ${employees.find((employee) => employee._id === item.createdBy)?.name ||
+                        'Inconnu'
+                        } ${employees.find((employee) => employee._id === item.createdBy)
+                          ?.familyName || ''
+                        }`}
                     </Text>
                     <Text style={styles.assignmentModalItemText}>
                       {user.language === 'English'
-                        ? `Given by: ${employees.find((employee) => employee._id === item.createdBy)?.name || 'Unknown'} ${employees.find((employee) => employee._id === item.createdBy)?.familyName || ''}`
-                        : `Donné par: ${employees.find((employee) => employee._id === item.createdBy)?.name || 'Inconnu'} ${employees.find((employee) => employee._id === item.createdBy)?.familyName || ''}`}
-                    </Text>
-                    <Text style={styles.assignmentModalItemText}>
-                      {user.language === 'English' ? `On: ${extractDate(item.date)}` : `Le: ${extractDate(item.date)}`}
+                        ? `On: ${extractDate(item.date)}`
+                        : `Le: ${extractDate(item.date)}`}
                     </Text>
                   </View>
 
@@ -559,15 +615,11 @@ const ClothesManagement: React.FC = () => {
                 <Text style={styles.assignmentModalActionTextSecondary}>
                   {user.language === 'English' ? 'Close' : 'Fermer'}
                 </Text>
-
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
-
-
-
 
 
 
@@ -584,19 +636,70 @@ const ClothesManagement: React.FC = () => {
               {user.language === 'English' ? 'Select Clothing Type:' : 'Sélectionner le Type de Vêtement :'}
             </Text>
 
-            <Picker
-              selectedValue={selectedClothesType || ''}
-              onValueChange={(itemValue) => setSelectedClothesType(itemValue)}
-              style={styles.picker}
+            {Platform.OS === 'web' ? (
+              <Picker
+                selectedValue={selectedClothesType || ''}
+                onValueChange={(itemValue) => setSelectedClothesType(itemValue)}
+                style={styles.picker}
+              >
+                <Picker.Item
+                  label={user.language === 'English' ? 'Select a clothing type' : 'Sélectionner un type de vêtement'}
+                  value=""
+                />
+                {clothes.map((item) => (
+                  <Picker.Item key={item._id} label={item.type} value={item._id} />
+                ))}
+              </Picker>
+            ) : (
+              <TouchableOpacity
+                style={styles.input} // Réutilisation des styles pour conserver l'apparence
+                onPress={() => setPickerModalVisible(true)}
+              >
+                <Text>
+                  {selectedClothesType
+                    ? clothes.find((item) => item._id === selectedClothesType)?.type
+                    : user.language === 'English'
+                      ? 'Select a clothing type'
+                      : 'Sélectionner un type de vêtement'}
+                </Text>
+              </TouchableOpacity>
+            )}
+            <Modal
+              visible={isPickerModalVisible}
+              animationType="slide"
+              onRequestClose={() => setPickerModalVisible(false)}
             >
-              <Picker.Item
-                label={user.language === 'English' ? 'Select a clothing type' : 'Sélectionner un type de vêtement'}
-                value=""
-              />
-              {clothes.map((item) => (
-                <Picker.Item key={item._id} label={item.type} value={item._id} />
-              ))}
-            </Picker>
+              <View style={styles.modalContent}>
+                <Text style={styles.modalHeader}>
+                  {user.language === 'English' ? 'Select Clothing Type' : 'Sélectionner le Type de Vêtement'}
+                </Text>
+                <FlatList
+                  data={clothes}
+                  keyExtractor={(item) => item._id}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      style={styles.clothesItem}
+                      onPress={() => {
+                        setSelectedClothesType(item._id);
+                        setPickerModalVisible(false);
+                      }}
+                    >
+                      <Text style={styles.assignmentText}>{item.type}</Text>
+                    </TouchableOpacity>
+                  )}
+                />
+                <TouchableOpacity
+                  style={styles.secondaryButton}
+                  onPress={() => setPickerModalVisible(false)}
+                >
+                  <Text style={styles.secondaryButtonText}>
+                    {user.language === 'English' ? 'Close' : 'Fermer'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </Modal>
+
+
             <TextInput
               style={styles.input}
               placeholder={user.language === 'English' ? 'Quantity' : 'Quantité'}
@@ -974,7 +1077,10 @@ const styles = StyleSheet.create({
     overflowY: 'auto', // Permet un défilement si le contenu dépasse
     boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.1)', // Effet d'ombre propre au web
   },
-
+  assignmentModalTextContainer: {
+    flex: 1,
+    marginRight: 10, // Espace entre le texte et le bouton
+  },
   // Commun aux deux plateformes
   assignmentModalTitle: {
     fontSize: 22,

@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { StyleSheet, Text, View, TouchableOpacity, ActivityIndicator, Alert, Platform, FlatList, Modal } from "react-native";
+import { StyleSheet, Text, View, TouchableOpacity, ActivityIndicator, Alert, Platform, FlatList, Modal, Dimensions } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import axios from "axios";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useRoute } from "@react-navigation/native";
+import { Image } from "react-native";
+import AppURL from "@/components/src/URL";
 
 // Define the type User
 type User = {
@@ -33,6 +35,7 @@ type TimeCard = {
   endTimeMs?: number | null; // Ajouté
   durationDifference?: string | null; // Ajouté
   endTimeDifference?: string | null; // Ajouté
+  image?: string;
 };
 
 
@@ -45,6 +48,8 @@ interface Comment {
   _id: string;
   text: string;
 }
+const screenWidth = Dimensions.get("window").width;
+const screenHeight = Dimensions.get("window").height;
 
 const CortexVsDa: React.FC = () => {
   const route = useRoute();
@@ -57,8 +62,30 @@ const CortexVsDa: React.FC = () => {
   const [comments, setComments] = useState<Record<string, string>>({}); // Stocker les commentaires
   const [selectedComment, setSelectedComment] = useState<string | null>(null); // Stocker le commentaire sélectionné
   const [isCommentModalVisible, setIsCommentModalVisible] = useState<boolean>(false); // Contrôle de la modale
+  const [selectedImage, setSelectedImage] = useState<string | null>(null); // Pour stocker l'image sélectionnée
+  const [isImageModalVisible, setIsImageModalVisible] = useState<boolean>(false); // Pour afficher ou masquer le modal
 
-
+  const handleLongPressEmployee = async (employeeId: string) => {
+    const timeCard = timeCards.find((tc) => tc.employeeId === employeeId);
+    if (timeCard?.image) {
+      setSelectedImage(`${AppURL}/uploads-timecard${timeCard.image}`);
+      setIsImageModalVisible(true);
+    } else {
+      const messageTitle =
+        user.language === "English" ? "No image available" : "Aucune image disponible";
+      const messageBody =
+        user.language === "English"
+          ? "This time card does not have an associated image."
+          : "Cette fiche de temps n'a pas d'image associée.";
+  
+      if (Platform.OS === "web") {
+        window.alert(`${messageTitle}\n${messageBody}`);
+      } else {
+        Alert.alert(messageTitle, messageBody);
+      }
+    }
+  };
+  
   const parseTimeToMilliseconds = (time: string | null): number | null => {
     if (!time) return null;
     const [hours, minutes] = time.split(":").map(Number);
@@ -87,18 +114,18 @@ const CortexVsDa: React.FC = () => {
   const fetchCommentsByDate = async () => {
     try {
       const formattedDate = formatDate(date); // Formater la date actuelle
-      
+
       const response = await axios.get(
-        `https://coral-app-wqv9l.ondigitalocean.app/api/comments/date/${encodeURIComponent(formattedDate)}?dsp_code=${user.dsp_code}`
+        `${AppURL}/api/comments/date/${encodeURIComponent(formattedDate)}?dsp_code=${user.dsp_code}`
       );
       console.log(response);
-      
+
 
       const commentsMap = response.data.reduce((acc: Record<string, string>, comment: any) => {
         acc[comment.idEmploye] = comment.comment; // Utilisez `comment.comment` au lieu de `comment.text`
         return acc;
       }, {});
-      
+
 
       setComments(commentsMap); // Mettre à jour l'état local
 
@@ -113,13 +140,13 @@ const CortexVsDa: React.FC = () => {
     try {
       const formattedDate = formatDate(selectedDate);
       const timeCardsRes = await axios.get<TimeCard[]>(
-        `https://coral-app-wqv9l.ondigitalocean.app/api/timecards/timecardsss/dday/${formattedDate}?dsp_code=${user.dsp_code}`
+        `${AppURL}/api/timecards/timecardsss/dday/${formattedDate}?dsp_code=${user.dsp_code}`
       );
       const rawTimeCards = timeCardsRes.data;
 
       const employeeIds = [...new Set(rawTimeCards.map((tc) => tc.employeeId))];
       const employeeRes = await axios.post<Employee[]>(
-        `https://coral-app-wqv9l.ondigitalocean.app/api/employee/by-ids?dsp_code=${user.dsp_code}`,
+        `${AppURL}/api/employee/by-ids?dsp_code=${user.dsp_code}`,
         { ids: employeeIds }
       );
 
@@ -135,7 +162,7 @@ const CortexVsDa: React.FC = () => {
         const cortexDurationMs = parseTimeToMilliseconds(tc.CortexDuree) ?? null;
 
         const workDurationMs =
-            startTimeMs !== null && endTimeMs !== null ? endTimeMs - startTimeMs - 30 * 60 * 1000 : null;
+          startTimeMs !== null && endTimeMs !== null ? endTimeMs - startTimeMs - 30 * 60 * 1000 : null;
 
         const durationDifference =
           workDurationMs !== null && cortexDurationMs !== null
@@ -188,18 +215,18 @@ const CortexVsDa: React.FC = () => {
 
   const calculateWorkDuration = (startTime: number | null, endTime: number | null): string => {
     if (startTime === null || endTime === null) return "N/A";
-  
+
     // Soustraire 30 minutes (30 * 60 * 1000 ms) du calcul de la durée
     const diffMs = endTime - startTime - 30 * 60 * 1000;
-  
+
     if (diffMs < 0) return "Invalid Time";
-  
+
     const hours = Math.floor(diffMs / (1000 * 60 * 60));
     const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-  
+
     return `${hours}h ${minutes}m`;
   };
-  
+
 
   const getColorForDifference = (difference: number | null): string => {
     if (difference === null) return "#001933"; // Bleu par défaut
@@ -229,6 +256,25 @@ const CortexVsDa: React.FC = () => {
       ? parseFloat(item.endTimeDifference.replace(/[^0-9.-]+/g, "")) * 60 * 1000
       : null;
 
+    let pressTimer: NodeJS.Timeout; // Timer pour simuler un appui long sur le web
+
+    const handleMouseDown = () => {
+      // Démarrer un timer pour simuler un appui long
+      pressTimer = setTimeout(() => {
+        handleLongPressEmployee(item.employeeId); // Appeler l'action pour un appui long
+      }, 500); // Délai pour l'appui long
+    };
+
+    const handleMouseUp = () => {
+      // Annuler le timer si l'utilisateur relâche avant la fin
+      clearTimeout(pressTimer);
+    };
+
+    const handleMouseLeave = () => {
+      // Annuler le timer si l'utilisateur déplace la souris avant la fin
+      clearTimeout(pressTimer);
+    };
+
     return (
       <View style={styles.row}>
         <Text
@@ -242,6 +288,15 @@ const CortexVsDa: React.FC = () => {
               setIsCommentModalVisible(true); // Afficher la modale
             }
           }}
+          {...(Platform.OS === "web"
+            ? {
+              onMouseDown: handleMouseDown, // Gérer le clic maintenu sur le web
+              onMouseUp: handleMouseUp, // Gérer la fin du clic maintenu
+              onMouseLeave: handleMouseLeave, // Gérer le déplacement de la souris
+            }
+            : {
+              onLongPress: () => handleLongPressEmployee(item.employeeId), // Action native pour mobile
+            })}
         >
           {employee ? `${employee.name} ${employee.familyName}` : "Unknown"}
         </Text>
@@ -255,13 +310,13 @@ const CortexVsDa: React.FC = () => {
         </Text>
         <Text style={styles.time}>{item.endTime || "N/A"}</Text>
         <Text style={styles.time}>{item.CortexEndTime || "N/A"}</Text>
-
         <Text style={{ ...styles.difference, color: getColorForDifference(endTimeDiffMs) }}>
           {item.endTimeDifference}
         </Text>
       </View>
     );
   };
+
 
 
 
@@ -353,32 +408,67 @@ const CortexVsDa: React.FC = () => {
         }
       />
       {isCommentModalVisible && (
-  <Modal
-    animationType="slide"
-    transparent={true}
-    visible={isCommentModalVisible}
-    onRequestClose={() => setIsCommentModalVisible(false)} // Fermer la modale
-  >
-    <View style={styles.modalOverlay}>
-      <View style={styles.modalContent}>
-        <Text style={styles.modalTitle}>
-          {user.language === "English" ? "Comment" : "Commentaire"}
-        </Text>
-        <Text style={styles.modalComment}>
-          {selectedComment || (user.language === "English" ? "No comment found." : "Aucun commentaire trouvé.")}
-        </Text>
-        <TouchableOpacity
-          style={styles.closeButton}
-          onPress={() => setIsCommentModalVisible(false)} // Fermer la modale
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={isCommentModalVisible}
+          onRequestClose={() => setIsCommentModalVisible(false)} // Fermer la modale
         >
-          <Text style={styles.closeButtonText}>
-            {user.language === "English" ? "Close" : "Fermer"}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  </Modal>
-)}
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>
+                {user.language === "English" ? "Comment" : "Commentaire"}
+              </Text>
+              <Text style={styles.modalComment}>
+                {selectedComment || (user.language === "English" ? "No comment found." : "Aucun commentaire trouvé.")}
+              </Text>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => setIsCommentModalVisible(false)} // Fermer la modale
+              >
+                <Text style={styles.closeButtonText}>
+                  {user.language === "English" ? "Close" : "Fermer"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {isImageModalVisible && (
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={isImageModalVisible}
+          onRequestClose={() => setIsImageModalVisible(false)} // Fermer le modal
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              {selectedImage ? (
+                <Image
+                  source={{ uri: selectedImage }}
+                  style={styles.imagePreview}
+                  resizeMode="contain" // Permet d'afficher l'image sans zoom ni modification
+                />
+              ) : (
+                <Text style={styles.noImageText}>
+                  {user.language === "English" ? "No image available" : "Aucune image disponible"}
+                </Text>
+              )}
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => setIsImageModalVisible(false)} // Fermer le modal
+              >
+                <Text style={styles.closeButtonText}>
+                  {user.language === "English" ? "Close" : "Fermer"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      )}
+
+
 
     </View>
   );
@@ -387,11 +477,26 @@ const CortexVsDa: React.FC = () => {
 export default CortexVsDa;
 
 const styles = StyleSheet.create({
+
+  imagePreview: {
+    width: Platform.OS === "web" ? "50%" : screenWidth * 0.9,
+    height: Platform.OS === "web" ? screenHeight * 0.7 : screenHeight * 0.7,
+    borderRadius: 10,
+    marginBottom: 20,
+    alignSelf: "center",
+  } ,
+  noImageText: {
+    fontSize: 16,
+    color: "#333",
+    textAlign: "center",
+    marginTop: 20,
+  },
+
   employeeWithComment: {
     textDecorationLine: "underline", // Souligner les noms avec des commentaires
     color: "#007BFF", // Couleur distincte
   },
-  
+
   modalOverlay: {
     flex: 1,
     justifyContent: "center",
@@ -432,7 +537,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
   },
-  
+
   time: {
     flex: 1,
     fontSize: 14,

@@ -15,12 +15,18 @@
     "jsx": "react-jsx",
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
-    "skipLibCheck": true,
     "resolveJsonModule": true,
     "forceConsistentCasingInFileNames": true,
     "module": "es2020",
     "target": "es2017",
-    "moduleResolution": "node"
+    "moduleResolution": "node",
+    "lib": [
+      "es2020",
+      "dom",
+      "dom.iterable"
+    ],
+    "isolatedModules": true,
+    "skipLibCheck": false
   },
   "include": [
     "**/*.ts",

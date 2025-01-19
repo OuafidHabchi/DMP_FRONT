@@ -46,6 +46,8 @@ type Disponibility = {
     shiftColor: string;
     confirmation: string;
     presence?: 'confirmed' | 'rejected'; // Presence field that may or may not exist
+    suspension?: boolean
+
 };
 
 interface Confirmation {
@@ -64,7 +66,6 @@ type TimeCard = {
 const Confirmation: React.FC = () => {
     const route = useRoute();
     const { user } = route.params as { user: User };
-    const [suspensionStatuses, setSuspensionStatuses] = useState<Record<string, boolean>>({});
     const [disponibilities, setDisponibilities] = useState<Disponibility[]>([]);
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [shifts, setShifts] = useState<Shift[]>([]);
@@ -86,6 +87,10 @@ const Confirmation: React.FC = () => {
     >([]);
     const [isSending, setIsSending] = useState(false); // Track button loading state
     const [refreshing, setRefreshing] = useState(false); // State pour gérer le "Pull to Refresh"
+    const [employeeCache, setEmployeeCache] = useState<Record<string, Employee[]>>({});
+    const [shiftCache, setShiftCache] = useState<Record<string, Shift[]>>({}); // Cache local pour les shifts
+
+
 
     // Fonction de rafraîchissement
     const handleRefresh = async () => {
@@ -130,75 +135,68 @@ const Confirmation: React.FC = () => {
         return 0; // Aucun horaire disponible pour ce jour
     };
 
-    const checkSuspensionsForDate = async (date: Date) => {
-        try {
-            const formattedDate = date.toISOString().split('T')[0]; // Format 'YYYY-MM-DD'
-            const employeeIds = employees.map((employee) => employee._id);
 
-            if (employeeIds.length === 0) return;
-
-            const response = await axios.post(`${AppURL}/api/warnings/wornings/suspensions/check`, {
-                employeIDs: employeeIds,
-                date: formattedDate,
-                dsp_code: user.dsp_code, // Ajout du dsp_code
-
-            });
-
-            setSuspensionStatuses(response.data.suspensions); // Mettre à jour les statuts de suspension
-        } catch (error) {
-            console.error('Erreur lors de la vérification des suspensions :', error);
-        }
-    };
     const fetchEmployees = async () => {
+        if (employeeCache[user.dsp_code]) {
+            setEmployees(employeeCache[user.dsp_code]);
+            return;
+        }
+
         try {
-            const response = await axios.get(`${AppURL}/api/employee`, {
-                params: {
-                    dsp_code: user.dsp_code, // Ajout du dsp_code
-                },
+            const { data } = await axios.get(`${AppURL}/api/employee`, {
+                params: { dsp_code: user.dsp_code },
             });
-            setEmployees(response.data);
-        } catch (error) {
-            console.error('Error fetching employees:', error);
+            setEmployees(data);
+            setEmployeeCache((prev) => ({ ...prev, [user.dsp_code]: data }));
+        } catch (error: any) {
+            console.error('Error fetching employees:', error.message);
         }
     };
-    
+
 
     const fetchShifts = async () => {
+        // Vérifier si les shifts sont déjà en cache pour le dsp_code actuel
+        if (shiftCache[user.dsp_code]) {
+            setShifts(shiftCache[user.dsp_code]); // Utiliser les données en cache
+            return;
+        }
+
         try {
+            // Si pas en cache, récupérer les données depuis l'API
             const response = await axios.get(`${AppURL}/api/shifts/shifts`, {
                 params: {
                     dsp_code: user.dsp_code, // Ajout du dsp_code
                 },
             });
-            setShifts(response.data);
+
+            setShifts(response.data); // Mettre à jour l'état local
+            setShiftCache((prev) => ({ ...prev, [user.dsp_code]: response.data })); // Mettre à jour le cache
         } catch (error) {
             console.error('Error fetching shifts:', error);
         }
     };
-    
+
 
     const fetchAllData = async () => {
         setLoading(true); // Activer l'état de chargement
         try {
-            // Charger toutes les données nécessaires
-            await fetchEmployees();
-            await fetchShifts();
-            await fetchDisponibilities();
-            await fetchTimeCards();
-            await checkSuspensionsForDate(currentDate);
+            // Exécuter les appels API en parallèle
+            await Promise.all([
+                fetchEmployees(),
+                fetchShifts(),
+                fetchDisponibilities(),
+                fetchTimeCards(),
+            ]);
 
-            // Vérifiez que toutes les données clés sont chargées
-            if (employees.length > 0 && shifts.length > 0 && disponibilities.length > 0) {
-                setCurrentWeekDates(getWeekDates(currentDate)); // Mettre à jour les dates de la semaine
-                updateCounts(); // Mettre à jour les compteurs
-            }
-            setLoading(false); // Désactiver le mode chargement
+            setCurrentWeekDates(getWeekDates(currentDate)); // Mettre à jour les dates de la semaine
+            updateCounts(); // Mettre à jour les compteurs
         } catch (error) {
             console.error('Erreur lors du chargement des données:', error);
         } finally {
             setLoading(false); // Désactiver l'état de chargement
         }
     };
+
 
 
     useEffect(() => {
@@ -242,52 +240,30 @@ const Confirmation: React.FC = () => {
     };
 
     const fetchDisponibilities = async () => {
-        if (employees.length === 0) return;
-    
         try {
-            const formattedDate = formatDateToString(currentDate);
-            const dispoData: Disponibility[] = [];
-    
-            for (let employee of employees) {
-                try {
-                    const response = await axios.get(
-                        `${AppURL}/api/disponibilites/disponibilites/employee/${employee._id}/day/${formattedDate}`,
-                        {
-                            params: {
-                                selectedDay: formattedDate,
-                                dsp_code: user.dsp_code,
-                            },
-                        }
-                    );
-    
-                    // Ajouter les disponibilités acceptées
-                    const acceptedDispo = response.data.filter(
-                        (dispo: { decisions: string }) => dispo.decisions === 'accepted'
-                    );
-                    dispoData.push(...acceptedDispo);
-                } catch (error :any) {
-                    // Gestion des erreurs spécifiques pour chaque employé
-                    if (error.response && error.response.status === 404) {
-                        console.warn(
-                            `No disponibilites found for employee ${employee._id} on ${formattedDate}.`
-                        );
-                    } else {
-                        console.error(
-                            `Error fetching disponibilites for employee ${employee._id}:`,
-                            error.message
-                        );
-                    }
-                }
+            const formattedDate = formatDateToString(currentDate); // Formater la date au format nécessaire
+            const response = await axios.get(`${AppURL}/api/disponibilites/byDate`, {
+                params: {
+                    selectedDay: formattedDate, // Passer la date comme paramètre
+                    dsp_code: user.dsp_code,    // Ajouter dsp_code si nécessaire
+                },
+            });
+
+            // Si l'API effectue déjà le filtrage côté back-end (decisions === 'accepted'), on peut ignorer cette étape.
+            // Sinon, appliquer ce filtre côté front comme ci-dessous.
+            const disponibilites = response.data; // Utiliser directement les données reçues
+            setDisponibilities(disponibilites); // Mettre à jour l'état avec les données reçues
+        } catch (error: any) {
+            // Vérification spécifique pour les erreurs 404 (aucune donnée trouvée)
+            if (error.response && error.response.status === 404) {
+                console.warn('No disponibilites found for the selected day.');
+                setDisponibilities([]); // Réinitialiser l'état si aucune disponibilité n'est trouvée
+            } else {
+                // Autres erreurs (exemple : problèmes réseau ou serveur)
+                console.error('Erreur lors de la récupération des disponibilités:', error.message);
             }
-    
-            setDisponibilities(dispoData);
-        } catch (error:any) {
-            console.error('Erreur lors de la récupération des disponibilités:', error.message);
         }
     };
-    
-    
-
 
 
 
@@ -330,7 +306,7 @@ const Confirmation: React.FC = () => {
 
     const sendBulkUpdates = async (confirmations: Confirmation[]) => {
         try {
-            const response = await axios.post('https://coral-app-wqv9l.ondigitalocean.app/api/disponibilites/updateDisponibilites/confirmation', {
+            const response = await axios.post(`${AppURL}/api/disponibilites/updateDisponibilites/confirmation`, {
                 confirmations,
                 dsp_code: user.dsp_code,
             });
@@ -588,9 +564,9 @@ const Confirmation: React.FC = () => {
                     </View>
 
                     <ScrollView style={styles.table}
-                     refreshControl={
-                        <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-                    }>
+                        refreshControl={
+                            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+                        }>
                         <View style={styles.row}>
                             <Text style={[styles.headerCell, { flex: 2 }]}>
                                 {user.language === 'English' ? 'Driver' : 'Chauffeur'}
@@ -619,7 +595,8 @@ const Confirmation: React.FC = () => {
                                     >
                                         ({calculateTotalWeeklyHours(dispo.employeeId).toFixed(2)} h)
                                     </Text>
-                                    {suspensionStatuses[dispo.employeeId] && (
+                                    {/* Affichez ⚠️ si suspension est true */}
+                                    {dispo.suspension && (
                                         <Text style={{ color: 'red', fontWeight: 'bold', fontSize: 20 }}> ⚠️</Text>
                                     )}
                                 </Text>
@@ -679,19 +656,19 @@ const Confirmation: React.FC = () => {
 
                             )}
                         </TouchableOpacity>
-                        
-                        {Platform.OS==="web" &&(
+
+                        {Platform.OS === "web" && (
                             <TouchableOpacity
-                            onPress={handleRefresh}
-                            style={styles.sendButton}
-                        >
-                            <Text style={styles.sendButtonText}>
-                                {user.language === 'English' ? 'Refresh' : 'Rafraîchir'}
-                            </Text>
-                        </TouchableOpacity>
+                                onPress={handleRefresh}
+                                style={styles.sendButton}
+                            >
+                                <Text style={styles.sendButtonText}>
+                                    {user.language === 'English' ? 'Refresh' : 'Rafraîchir'}
+                                </Text>
+                            </TouchableOpacity>
 
                         )}
-                        
+
                     </View>
 
 

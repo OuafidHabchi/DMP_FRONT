@@ -3,7 +3,6 @@ import { StyleSheet, Text, View, FlatList, ActivityIndicator, Alert, TouchableOp
 import axios from "axios";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useRoute } from "@react-navigation/native";
-import { RefreshControl } from "react-native"; // Import nécessaire pour Pull to Refresh
 import AppURL from "@/components/src/URL";
 
 
@@ -99,6 +98,9 @@ const DrivableVansAndConfirmedEmployees = () => {
   const [searchQuery, setSearchQuery] = useState(""); // Search state
   const [isAssigning, setIsAssigning] = useState(false); // Pour gérer l'état de chargement
   const [refreshing, setRefreshing] = useState(false); // État pour gérer le Pull to Refresh
+  const [reportIssues, setReportIssues] = useState<ReportIssue[]>([]);
+
+  
 
   const handleRefresh = async () => {
     setRefreshing(true); // Début du rafraîchissement
@@ -151,24 +153,40 @@ const DrivableVansAndConfirmedEmployees = () => {
   };
 
   const fetchData = async () => {
-    setLoading(true);
+    setLoading(true); // Activer l'indicateur de chargement
     try {
-      // Fetch vehicles and filter drivable vans
-      const vehicleResponse = await axios.get(URL_FLEET, {
-        params: { dsp_code: user.dsp_code },
-      });
+      // Effectuer les appels API principaux en parallèle
+      const [
+        vehicleResponse,
+        reportIssuesResponse,
+        statusesResponse,
+        shiftsResponse,
+        employeeResponse,
+        confirmedDisposResponse // Ajouter la requête pour les disponibilités confirmées
+      ] = await Promise.all([
+        axios.get(URL_FLEET, { params: { dsp_code: user.dsp_code } }),
+        axios.get(`${URL_REPORT_ISSUES}/all`, { params: { dsp_code: user.dsp_code } }),
+        axios.get(URL_STATUSES, { params: { dsp_code: user.dsp_code } }),
+        axios.get(`${URL_SHIFTS}/shifts`, { params: { dsp_code: user.dsp_code } }),
+        axios.get(URL_EMPLOYEES, { params: { dsp_code: user.dsp_code } }),
+        axios.get(`${URL_DISPONIBILITE}/presence/confirmed-by-day`, {
+          params: {
+            selectedDay: formatDate(selectedDate),
+            dsp_code: user.dsp_code,
+          },
+        }),
+      ]);
+  
+      // Traiter les réponses
       const vehicles: Vehicle[] = vehicleResponse.data.data;
-
-      const reportIssuesResponse = await axios.get(`${URL_REPORT_ISSUES}/all`, {
-        params: { dsp_code: user.dsp_code },
-      });
       const reportIssues: ReportIssue[] = reportIssuesResponse.data;
-
-      const statusesResponse = await axios.get(URL_STATUSES, {
-        params: { dsp_code: user.dsp_code },
-      });
+      setReportIssues(reportIssues); // Stockez reportIssues dans l'état
       const statusesData: Status[] = statusesResponse.data;
-
+      const shiftsData: Shift[] = shiftsResponse.data;
+      const employeesData: Employee[] = employeeResponse.data;
+      const confirmedDispos: Disponibility[] = confirmedDisposResponse.data;
+  
+      // Préparer les véhicules drivable
       const drivableVehicles = vehicles
         .filter((vehicle) => reportIssues.some((issue) => issue.vanId === vehicle._id && issue.drivable === true))
         .map((vehicle) => {
@@ -182,51 +200,22 @@ const DrivableVansAndConfirmedEmployees = () => {
             statusColor: vehicleStatus ? vehicleStatus.color : "#d3d3d3",
           };
         });
-
-      // Fetch employees
-      const employeeResponse = await axios.get(URL_EMPLOYEES, {
-        params: { dsp_code: user.dsp_code },
+  
+      // Mapper les disponibilités confirmées aux employés
+      const confirmedEmployeesList = confirmedDispos.map((dispo) => {
+        const employee = employeesData.find((emp) => emp._id === dispo.employeeId);
+        return {
+          employee: employee || { _id: dispo.employeeId, name: "Unknown", familyName: "" }, // Utiliser "Unknown" si non trouvé
+          shiftId: dispo.shiftId,
+        };
       });
-      const employeesData: Employee[] = employeeResponse.data;
-
-      // Fetch shifts
-      const shiftsResponse = await axios.get(`${URL_SHIFTS}/shifts`, {
-        params: { dsp_code: user.dsp_code },
-      });
-      const shiftsData: Shift[] = shiftsResponse.data;
-
-      // Fetch confirmed employees by availability for the selected date
-      const confirmedEmployeesList: { employee: Employee, shiftId: string }[] = [];
-      for (const employee of employeesData) {
-        try {
-          // Add dsp_code as a query parameter
-          const dispoResponse = await axios.get(
-            `${URL_DISPONIBILITE}/disponibilites/employee/${employee._id}/day/${formatDate(selectedDate)}`,
-            {
-              params: { dsp_code: user.dsp_code }, // Include dsp_code here
-            }
-          );
-          const disponibilites: Disponibility[] = dispoResponse.data;
-
-          const confirmedDispo = disponibilites.find(
-            (dispo) => dispo.confirmation === "confirmed" && dispo.presence === "confirmed"
-          );
-
-          if (confirmedDispo) {
-            confirmedEmployeesList.push({ employee, shiftId: confirmedDispo.shiftId });
-          }
-        } catch (dispoError) {
-          console.error(`Error fetching disponibility for employee ${employee._id}:`, dispoError);
-        }
-      }
-
-
-      // Set initial states for vans, employees, and shifts
+  
+      // Mettre à jour les états
       setDrivableVans(drivableVehicles);
       setConfirmedEmployees(confirmedEmployeesList);
       setShifts(shiftsData);
-
-      // Fetch assignments for the selected date and update state accordingly
+  
+      // Charger les assignations pour la date sélectionnée
       await fetchAssignmentsByDate();
     } catch (error: any) {
       console.error("Error fetching data:", error);
@@ -242,9 +231,12 @@ const DrivableVansAndConfirmedEmployees = () => {
         Alert.alert("Request Error", error.message);
       }
     } finally {
-      setLoading(false);
+      setLoading(false); // Désactiver l'indicateur de chargement
     }
   };
+  
+  
+  
 
 
   const getShiftColor = (shiftId: string): string => {
@@ -354,6 +346,9 @@ const DrivableVansAndConfirmedEmployees = () => {
             van._id === currentAssignment.van._id
               ? { ...van, statusColor: currentAssignment.van.statusColor }
               : van
+               
+
+
           )
         );
       }
@@ -527,39 +522,42 @@ const DrivableVansAndConfirmedEmployees = () => {
 
   // Fonction principale pour gérer la création ou mise à jour des assignations
   const handleAssign = async () => {
-    setIsAssigning(true); // Début du chargement
+    setIsAssigning(true);
     const formattedDate = formatDate(selectedDate);
-
+  
     const assignmentsForDate = assignments
       .filter((a) => a.date === formattedDate)
-      .map((a) => ({
-        employeeId: a.employee._id,
-        vanId: a.van._id,
-        date: a.date,
-      }));
-
+      .map((a) => {
+        const relatedIssue = reportIssues.find((issue) => issue.vanId === a.van._id);
+        return {
+          employeeId: a.employee._id,
+          vanId: a.van._id,
+          date: a.date,
+          statusId: relatedIssue?.statusId || null,
+        };
+      });
+  
     try {
       for (const assignment of assignmentsForDate) {
-        const { employeeId, vanId, date } = assignment;
-
+        const { employeeId, vanId, date, statusId } = assignment;
+  
         const response = await axios.get(`${URL_vanAssignmen}/date/${date}`, {
-          params: { dsp_code: user.dsp_code }, // Add dsp_code here
+          params: { dsp_code: user.dsp_code },
         });
         const existingAssignments = response.data as Array<{
           employeeId: string;
           vanId: string;
           date: string;
+          statusId: string;
         }>;
-
-        const existingAssignment = existingAssignments.find(
-          (a) => a.employeeId === employeeId
-        );
-
+  
+        const existingAssignment = existingAssignments.find((a) => a.employeeId === employeeId);
+  
         if (existingAssignment) {
-          if (existingAssignment.vanId !== vanId) {
+          if (existingAssignment.vanId !== vanId || existingAssignment.statusId !== statusId) {
             await axios.put(
               `${URL_vanAssignmen}/assignments/${date}/${employeeId}`,
-              { vanId },
+              { vanId, statusId },
               {
                 headers: { "Content-Type": "application/json" },
                 params: { dsp_code: user.dsp_code },
@@ -569,33 +567,32 @@ const DrivableVansAndConfirmedEmployees = () => {
         } else {
           await axios.post(
             `${URL_vanAssignmen}/create`,
-            { employeeId, vanId, date,dsp_code: user.dsp_code, },
+            { employeeId, vanId, date, statusId, dsp_code: user.dsp_code },
             { headers: { "Content-Type": "application/json" } }
           );
         }
       }
+  
       showAlert(
-        user.language === 'English'
-          ? "Success"
-          : "Succès",
-        user.language === 'English'
+        user.language === "English" ? "Success" : "Succès",
+        user.language === "English"
           ? "Assignments processed successfully."
           : "Affectations traitées avec succès."
       );
     } catch (error) {
       console.error("Error during assignment process:", error);
       showAlert(
-        user.language === 'English'
-          ? "Error"
-          : "Erreur",
-        user.language === 'English'
+        user.language === "English" ? "Error" : "Erreur",
+        user.language === "English"
           ? "Failed to process assignments."
           : "Échec du traitement des affectations."
       );
     } finally {
-      setIsAssigning(false); // Fin du chargement
+      setIsAssigning(false);
     }
   };
+  
+
 
 
   const handleLongPress = async (employeeId: string) => {
@@ -827,10 +824,6 @@ const DrivableVansAndConfirmedEmployees = () => {
         )}
 
       </View>
-
-
-
-
       {instructionText && (
         <View style={styles.instructionContainer}>
           <Text style={styles.instructionText}>{instructionText}</Text>

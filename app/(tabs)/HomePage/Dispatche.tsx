@@ -36,7 +36,7 @@ type User = {
 };
 
 // Rasa server URL
-const rasaServerUrl = "http://138.197.172.64:5005/webhooks/rest/webhook";
+const rasaServerUrl = "https://primlelogistique.com//webhooks/rest/webhook";
 
 const Dispatche = () => {
   const route = useRoute();

@@ -16,11 +16,14 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
 import { useRoute } from '@react-navigation/native';
+import AppURL from '@/components/src/URL';
+
 
 type PowerBank = {
     _id: string;
     name: string;
     functional: boolean;
+    comment: string;
 };
 
 type User = {
@@ -37,7 +40,6 @@ type User = {
     expoPushToken?: string;
 };
 
-const URL_PowerBanks = 'https://coral-app-wqv9l.ondigitalocean.app/api/powerbanks';
 
 const PowerBanks: React.FC = () => {
     const route = useRoute();
@@ -55,12 +57,14 @@ const PowerBanks: React.FC = () => {
     const [powerBankDetails, setPowerBankDetails] = useState({
         name: '',
         functional: true,
+        comment: '', // Nouveau champ
     });
+
 
     const fetchPowerBanks = async () => {
         setLoading(true);
         try {
-            const response = await axios.get<PowerBank[]>(`${URL_PowerBanks}/powerbanks?dsp_code=${user.dsp_code}`);
+            const response = await axios.get<PowerBank[]>(`${AppURL}/api/powerbanks/powerbanks?dsp_code=${user.dsp_code}`);
             setPowerBanks(response.data);
             setFilteredPowerBanks(response.data);
             setError(null);
@@ -107,18 +111,19 @@ const PowerBanks: React.FC = () => {
             setPowerBankDetails({
                 name: powerBank.name,
                 functional: powerBank.functional,
+                comment: powerBank.comment
             });
             setIsEditing(true);
         } else {
             setSelectedPowerBank(null);
-            setPowerBankDetails({ name: '', functional: true });
+            setPowerBankDetails({ name: '', functional: true, comment: '' });
             setIsEditing(false);
         }
         setModalVisible(true);
     };
 
     const handleAddPowerBank = async () => {
-        const { name } = powerBankDetails;
+        const { name, comment } = powerBankDetails;
 
         if (!name) {
             Alert.alert('Validation Error', 'Please fill in all required fields.');
@@ -126,7 +131,11 @@ const PowerBanks: React.FC = () => {
         }
 
         try {
-            const response = await axios.post<PowerBank>(`${URL_PowerBanks}/powerbanks?dsp_code=${user.dsp_code}`, powerBankDetails);
+            const response = await axios.post<PowerBank>(`${AppURL}/api/powerbanks/powerbanks?dsp_code=${user.dsp_code}`, {
+                name,
+                functional: powerBankDetails.functional,
+                comment, // Nouveau champ
+            });
             setPowerBanks((prev) => [...prev, response.data]);
             setFilteredPowerBanks((prev) => [...prev, response.data]);
             Alert.alert('Success', 'PowerBank added successfully!');
@@ -136,13 +145,18 @@ const PowerBanks: React.FC = () => {
         }
     };
 
+
     const handleUpdatePowerBank = async () => {
         if (!selectedPowerBank) return;
 
         try {
             const response = await axios.put<PowerBank>(
-                `${URL_PowerBanks}/powerbanks/${selectedPowerBank._id}?dsp_code=${user.dsp_code}`,
-                powerBankDetails
+                `${AppURL}/api/powerbanks/powerbanks/${selectedPowerBank._id}?dsp_code=${user.dsp_code}`,
+                {
+                    name: powerBankDetails.name,
+                    functional: powerBankDetails.functional,
+                    comment: powerBankDetails.comment, // Nouveau champ
+                }
             );
             setPowerBanks((prev) =>
                 prev.map((pb) => (pb._id === selectedPowerBank._id ? response.data : pb))
@@ -157,11 +171,12 @@ const PowerBanks: React.FC = () => {
         }
     };
 
+
     const handleDeletePowerBank = async () => {
         if (!selectedPowerBank) return;
 
         try {
-            await axios.delete(`${URL_PowerBanks}/powerbanks/${selectedPowerBank._id}?dsp_code=${user.dsp_code}`);
+            await axios.delete(`${AppURL}/api/powerbanks/powerbanks/${selectedPowerBank._id}?dsp_code=${user.dsp_code}`);
             setPowerBanks((prev) => prev.filter((pb) => pb._id !== selectedPowerBank._id));
             setFilteredPowerBanks((prev) => prev.filter((pb) => pb._id !== selectedPowerBank._id));
             Alert.alert('Success', 'PowerBank deleted successfully!');
@@ -232,10 +247,25 @@ const PowerBanks: React.FC = () => {
 
                         <TextInput
                             style={styles.input}
-                            value={powerBankDetails.name}
+                            value={powerBankDetails.name || ''} // Garantit une chaîne vide si name est indéfini
                             onChangeText={(text) => setPowerBankDetails({ ...powerBankDetails, name: text })}
-                            placeholder={user.language === 'English' ? 'Enter powerbank name' : 'Entrez le nom du powerbank'}
+                            placeholder={
+                                user.language === 'English'
+                                    ? 'Enter powerbank name'
+                                    : 'Entrez le nom du powerbank'
+                            }
                         />
+                        <TextInput
+                            style={styles.input}
+                            value={powerBankDetails.comment || ''} // Garantit une chaîne vide si comment est indéfini
+                            onChangeText={(text) => setPowerBankDetails({ ...powerBankDetails, comment: text })}
+                            placeholder={
+                                user.language === 'English'
+                                    ? 'Enter comment'
+                                    : 'Entrez un commentaire'
+                            }
+                        />
+
                         <View style={styles.toggleContainer}>
                             <Text style={styles.label}>
                                 {user.language === 'English' ? 'Functional:' : 'Fonctionnel :'}

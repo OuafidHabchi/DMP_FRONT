@@ -16,9 +16,9 @@ import {
 import { useRoute } from '@react-navigation/native';
 import axios from 'axios';
 import ImageViewer from 'react-native-image-zoom-viewer';
+import AppURL from '@/components/src/URL';
+import EquipmentUpdatesModal from '@/components/src/EquipmentUpdatesModal';
 
-
-const URL_DailyNote = 'https://coral-app-wqv9l.ondigitalocean.app';
 
 interface Employee {
   familyName: string;
@@ -51,6 +51,11 @@ interface DailyNote {
   photo?: string; // Ajout de la propriété photo
   time: string;
 }
+interface EquipmentModalState {
+  visible: boolean;
+  photoType: string;
+}
+
 
 
 export default function Home() {
@@ -66,6 +71,11 @@ export default function Home() {
   const [loadingDetails, setLoadingDetails] = useState<boolean>(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const blinkingAnimation = useRef(new Animated.Value(1)).current;
+  const [isEquipmentModalVisible, setIsEquipmentModalVisible] = useState<EquipmentModalState>({
+    visible: false,
+    photoType: '',
+  });
+
 
   // Animation blinking
   useEffect(() => {
@@ -98,7 +108,7 @@ export default function Home() {
       setLoading(true);
       try {
         const formattedDate = selectedDate.toDateString();
-        const response = await axios.get<DailyNote[]>(`${URL_DailyNote}/api/dailyNotes/by-date`, {
+        const response = await axios.get<DailyNote[]>(`${AppURL}/api/dailyNotes/by-date`, {
           params: {
             date: formattedDate,
             dsp_code: user.dsp_code, // Ajout de dsp_code
@@ -135,7 +145,7 @@ export default function Home() {
       setLoadingDetails(true); // Commencez à afficher le spinner
       setIsModalVisible(true); // Affichez immédiatement le modal pour le spinner
 
-      const response = await axios.get(`${URL_DailyNote}/api/dailyNotes/details/${noteId}`, {
+      const response = await axios.get(`${AppURL}/api/dailyNotes/details/${noteId}`, {
         params: { dsp_code: user.dsp_code }, // Ajout de dsp_code
       });
       const noteDetails = response.data;
@@ -143,7 +153,7 @@ export default function Home() {
 
       if (!noteDetails.lu) {
         await axios.patch(
-          `${URL_DailyNote}/api/dailyNotes/mark-as-read`,
+          `${AppURL}/api/dailyNotes/mark-as-read`,
           { noteId },
           { params: { dsp_code: user.dsp_code } } // Ajout de dsp_code
         );
@@ -215,9 +225,39 @@ export default function Home() {
 
       </Animated.View>
 
-      <Text style={styles.title}>
-        {user.language === 'English' ? 'Home' : 'Accueil'}
-      </Text>
+      <View style={styles.buttonRow}>
+        <TouchableOpacity
+          onPress={() => setIsEquipmentModalVisible({ visible: true, photoType: 'prepic' })}
+          style={[styles.button, styles.preButton]}
+        >
+          <Text style={styles.buttonText}>
+            {user.language === 'English' ? 'Work Tools Pre' : 'Outils de Travail Avant'}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => setIsEquipmentModalVisible({ visible: true, photoType: 'postpic' })}
+          style={[styles.button, styles.postButton]}
+        >
+          <Text style={styles.buttonText}>
+            {user.language === 'English' ? 'Work Tools Post' : 'Outils de Travail Après'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+
+
+      <Modal visible={isEquipmentModalVisible.visible} animationType="fade">
+        <View style={{ flex: 1 }}>
+          <EquipmentUpdatesModal
+            day={selectedDate.toDateString()}
+            photoType={isEquipmentModalVisible.photoType}
+            dspCode={user.dsp_code}
+            onClose={() => setIsEquipmentModalVisible({ visible: false, photoType: '' })}
+          />
+        </View>
+      </Modal>
+
+
       <Text style={styles.dateText}>{selectedDate.toDateString()}</Text>
 
       <View style={styles.navigationContainer}>
@@ -333,7 +373,7 @@ export default function Home() {
         {selectedNote?.photo && (
           <Modal visible={isModalVisibleImage} transparent animationType="fade">
             <ImageViewer
-              imageUrls={[{ url: selectedNote.photo }]}
+              imageUrls={[{ url: selectedNote.photo ? `${AppURL}/${selectedNote.photo}` : '' }]}
               enableSwipeDown={true}
               onSwipeDown={() => setIsModalVisibleImage(false)}
               renderHeader={() => (
@@ -359,6 +399,31 @@ export default function Home() {
 }
 
 const styles = StyleSheet.create({
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  button: {
+    flex: 1,
+    padding: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginHorizontal: 5,
+  },
+  preButton: {
+    backgroundColor: '#ffffff',
+  },
+  postButton: {
+    backgroundColor: '#ffffff',
+  },
+  buttonText: {
+    color: '#001933',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+
+
   loadingIndicatorSpinner: {
     marginVertical: 20,
   },

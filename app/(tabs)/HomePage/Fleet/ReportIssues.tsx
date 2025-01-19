@@ -3,6 +3,7 @@ import { StyleSheet, Text, View, FlatList, TouchableOpacity, Modal, Button, Text
 import axios from 'axios';
 import { useRoute } from '@react-navigation/native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withRepeat, interpolateColor } from 'react-native-reanimated';
+import AppURL from '@/components/src/URL';
 
 
 
@@ -47,9 +48,7 @@ type ReportIssue = {
   note: string;
 };
 
-const API_URL = 'https://coral-app-wqv9l.ondigitalocean.app';
-const URL_Fleet = 'https://coral-app-wqv9l.ondigitalocean.app';
-const URL_ReportIssues = 'https://coral-app-wqv9l.ondigitalocean.app';
+
 
 const ReportIssues = () => {
   const route = useRoute();
@@ -67,11 +66,10 @@ const ReportIssues = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-
   const blinkOpacity = useSharedValue(1); // Clignotement
   const colorValue = useSharedValue(isDrivable ? 1 : 0); // Couleur
-
   const textScale = useSharedValue(1); // Valeur pour la taille
+
 
   useEffect(() => {
     if (isModalVisible) {
@@ -119,13 +117,13 @@ const ReportIssues = () => {
   const fetchVehiclesAndIssues = async () => {
     setLoading(true);
     try {
-      const vehicleResponse = await axios.get(`${URL_Fleet}/api/vehicles/all?dsp_code=${user.dsp_code}`);
+      const vehicleResponse = await axios.get(`${AppURL}/api/vehicles/all?dsp_code=${user.dsp_code}`);
       const vehiclesData: Vehicle[] = vehicleResponse.data.data;
 
-      const statusResponse = await axios.get(`${API_URL}/api/statuses/all?dsp_code=${user.dsp_code}`);
+      const statusResponse = await axios.get(`${AppURL}/api/statuses/all?dsp_code=${user.dsp_code}`);
       const statusesData: Status[] = statusResponse.data;
 
-      const issuesResponse = await axios.get(`${URL_ReportIssues}/api/reportIssues/all?dsp_code=${user.dsp_code}`);
+      const issuesResponse = await axios.get(`${AppURL}/api/reportIssues/all?dsp_code=${user.dsp_code}`);
       const issuesData: ReportIssue[] = issuesResponse.data;
 
       const updatedVehicles = vehiclesData.map((vehicle) => {
@@ -160,14 +158,14 @@ const ReportIssues = () => {
 
       try {
         if (currentReport) {
-          await axios.put(`${URL_ReportIssues}/api/reportIssues/update/${currentReport._id}?dsp_code=${user.dsp_code}`, reportData);
+          await axios.put(`${AppURL}/api/reportIssues/update/${currentReport._id}?dsp_code=${user.dsp_code}`, reportData);
           showAlert(
             user.language === 'English' ? 'Success' : 'Succès',
             user.language === 'English' ? 'Report issue updated successfully' : 'Problème de rapport mis à jour avec succès'
           );
 
         } else {
-          await axios.post(`${URL_ReportIssues}/api/reportIssues/create?dsp_code=${user.dsp_code}`, reportData);
+          await axios.post(`${AppURL}/api/reportIssues/create?dsp_code=${user.dsp_code}`, reportData);
           showAlert(
             user.language === 'English' ? 'Success' : 'Succès',
             user.language === 'English' ? 'New report issue created successfully' : 'Nouveau problème de rapport créé avec succès'
@@ -254,10 +252,25 @@ const ReportIssues = () => {
         value={searchQuery}
         onChangeText={setSearchQuery}
       />
-
+      {Platform.OS==='web' && (
+        <View style={styles.statsContainer}>
+        <Text style={styles.statsText}>
+          {user.language === 'English'
+            ? `Total Vans: ${vehicles.length}`
+            : `Nombre total de vans : ${vehicles.length}`}
+        </Text>
+        <Text style={styles.statsText}>
+          {user.language === 'English'
+            ? `Drivable Vans: ${vehicles.filter(van => reportIssues.every(issue => issue.vanId !== van._id || issue.drivable)).length}`
+            : `Vans conduisibles : ${vehicles.filter(van => reportIssues.every(issue => issue.vanId !== van._id || issue.drivable)).length}`}
+        </Text>
+      </View>
+      )}
+      
       {loading ? (
         <ActivityIndicator size="large" color="#001933" />
       ) : (
+
         <FlatList
           data={vehicles.filter(vehicle =>
             vehicle.vehicleNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -365,6 +378,26 @@ const ReportIssues = () => {
 export default ReportIssues;
 
 const styles = StyleSheet.create({
+
+  statsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
+    marginBottom: 10,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  statsText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#001933',
+  },  
   searchBar: {
     backgroundColor: '#ffffff',
     borderRadius: 12,

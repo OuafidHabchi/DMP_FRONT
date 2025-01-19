@@ -4,12 +4,8 @@ import axios from 'axios';
 import Icon from 'react-native-vector-icons/Ionicons'; // Import icons
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRoute } from '@react-navigation/native';
-
-// Base URLs
-const URL_EMPLOYEES = 'https://coral-app-wqv9l.ondigitalocean.app'; // Employees port
-const URL_SHIFTS = 'https://coral-app-wqv9l.ondigitalocean.app'; // Shifts port
-const URL_DISPO = 'https://coral-app-wqv9l.ondigitalocean.app'; // Availability port
-
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import AppURL from '@/components/src/URL';
 type ScoreCard = 'Fantastic' | 'Great' | 'Fair' | 'Poor' | 'New DA';
 
 type User = {
@@ -56,19 +52,6 @@ type Disponibility = {
   counted?: boolean; // To know if this availability has already been counted
   decisions?: 'pending' | 'accepted' | 'rejected'; // Correction: use of "decisions" with an "s"
 };
-type Warning = {
-  _id: string;
-  employeID: string;
-  type: string;
-  raison: string;
-  description: string;
-  severity: string;
-  date: string;
-  read: boolean;
-  signature?: boolean;
-  startDate?: string;
-  endDate: string;
-};
 
 const EmployeesAvaibilities = () => {
   const route = useRoute();
@@ -88,6 +71,25 @@ const EmployeesAvaibilities = () => {
   const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true); // Add loading state
   const [isSummaryModalVisible, setIsSummaryModalVisible] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false); // Indique s'il y a des changements non publiés
+  const [isPublishing, setIsPublishing] = useState(false); // État de chargement pour le bouton Publish
+
+
+  const saveUnsavedChangesToStorage = async (changes: Disponibility[], hasUnsaved: boolean) => {
+    try {
+      await AsyncStorage.setItem('unsavedChanges', JSON.stringify(changes));
+      await AsyncStorage.setItem('hasUnsavedChanges', JSON.stringify(hasUnsaved));
+      console.log('Unsaved changes and state saved to storage');
+    } catch (error) {
+      console.error('Error saving unsaved changes and state to storage:', error);
+      Alert.alert('Error', 'Unable to save unsaved changes.');
+    }
+  };
+
+
+
+
+
 
   // Function to prepare the summary data structure for the current week
   const getWeeklyShiftSummary = () => {
@@ -147,30 +149,57 @@ const EmployeesAvaibilities = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        setLoading(true); // Start loading before fetching
-        const employeesResponse = await axios.get(`${URL_EMPLOYEES}/api/employee`, {
+        setLoading(true);
+
+        // Charger les disponibilités et l'état depuis AsyncStorage
+        const savedChanges = await AsyncStorage.getItem('unsavedChanges');
+        const parsedChanges: Disponibility[] = savedChanges ? JSON.parse(savedChanges) : [];
+
+        const savedUnsavedState = await AsyncStorage.getItem('hasUnsavedChanges');
+        const parsedUnsavedState = savedUnsavedState ? JSON.parse(savedUnsavedState) : false;
+
+        // Récupérer les données du backend
+        const employeesResponse = await axios.get(`${AppURL}/api/employee`, {
           params: { dsp_code: user.dsp_code },
         });
-        const shiftsResponse = await axios.get(`${URL_SHIFTS}/api/shifts/shifts`, {
+        const shiftsResponse = await axios.get(`${AppURL}/api/shifts/shifts`, {
           params: { dsp_code: user.dsp_code },
         });
-        const dispoResponse = await axios.get(`${URL_DISPO}/api/disponibilites/disponibilites`, {
+        const dispoResponse = await axios.get(`${AppURL}/api/disponibilites/disponibilites`, {
           params: { dsp_code: user.dsp_code },
         });
+
+        const backendDisponibilities: Disponibility[] = dispoResponse.data;
+
+        // Fusionner les données backend et locales
+        const mergedDisponibilities = backendDisponibilities.map((backendDispo) => {
+          const localChange = parsedChanges.find(
+            (change) =>
+              change.employeeId === backendDispo.employeeId &&
+              new Date(change.selectedDay).toDateString() === new Date(backendDispo.selectedDay).toDateString()
+          );
+          return localChange ? { ...backendDispo, ...localChange } : backendDispo;
+        });
+
+        // Mettre à jour les états
         setEmployees(employeesResponse.data);
         setShifts(shiftsResponse.data);
-        setDisponibilities(dispoResponse.data);
-        setFilteredEmployees(employeesResponse.data); // Init filtered employees
+        setDisponibilities(mergedDisponibilities);
+        setHasUnsavedChanges(parsedUnsavedState);
+        setFilteredEmployees(employeesResponse.data);
       } catch (error) {
         console.error('Error fetching data:', error);
+        Alert.alert('Error', 'An error occurred while loading data.');
       } finally {
-        setLoading(false); // End loading after data is fetched
+        setLoading(false);
       }
     };
 
     fetchData();
-    setCurrentWeekDates(getWeekDates(weekOffset)); // Initialize with the current week
+    setCurrentWeekDates(getWeekDates(weekOffset));
   }, [weekOffset]);
+
+
 
 
   // Function to check if an employee is available for a shift on a given date
@@ -269,7 +298,7 @@ const EmployeesAvaibilities = () => {
     }
 
     try {
-      const response = await axios.post(`${URL_DISPO}/api/disponibilites/disponibilites/create`, {
+      const response = await axios.post(`${AppURL}/api/disponibilites/disponibilites/create`, {
         employeeId,
         selectedDay: date.toDateString(),
         shiftId,
@@ -288,17 +317,27 @@ const EmployeesAvaibilities = () => {
     }
   };
 
-  const handleAccept = (employeeId: string, date: Date) => {
+  const handleAccept = async (employeeId: string, date: Date) => {
     setDisponibilities((prev) =>
       prev.map((dispo) => {
         if (dispo.employeeId === employeeId && new Date(dispo.selectedDay).toDateString() === date.toDateString()) {
           if (dispo.status === 'rejected') {
-            setRejectedCount((prev) => prev - 1); // Decrement rejected if already rejected
-            setAcceptedCount((prev) => prev + 1); // Increment accepted
+            setRejectedCount((prev) => prev - 1);
+            setAcceptedCount((prev) => prev + 1);
           } else if (!dispo.status) {
-            setAcceptedCount((prev) => prev + 1); // If it's the first decision
+            setAcceptedCount((prev) => prev + 1);
           }
-          return { ...dispo, status: 'accepted', decisions: 'accepted' };
+
+          const updatedDispo: Disponibility = {
+            ...dispo,
+            status: 'accepted', // Utilisation correcte du type
+            decisions: 'accepted',
+          };
+
+          setHasUnsavedChanges(true);
+          saveUnsavedChangesToStorage([...prev.filter((d) => d !== dispo), updatedDispo], true);
+
+          return updatedDispo;
         }
         return dispo;
       })
@@ -306,17 +345,28 @@ const EmployeesAvaibilities = () => {
     setSelectedCell(null);
   };
 
-  const handleReject = (employeeId: string, date: Date) => {
+
+  const handleReject = async (employeeId: string, date: Date) => {
     setDisponibilities((prev) =>
       prev.map((dispo) => {
         if (dispo.employeeId === employeeId && new Date(dispo.selectedDay).toDateString() === date.toDateString()) {
           if (dispo.status === 'accepted') {
-            setAcceptedCount((prev) => prev - 1); // Decrement accepted if already accepted
-            setRejectedCount((prev) => prev + 1); // Increment rejected
+            setAcceptedCount((prev) => prev - 1);
+            setRejectedCount((prev) => prev + 1);
           } else if (!dispo.status) {
-            setRejectedCount((prev) => prev + 1); // If it's the first decision
+            setRejectedCount((prev) => prev + 1);
           }
-          return { ...dispo, status: 'rejected', decisions: 'rejected' };
+
+          const updatedDispo: Disponibility = {
+            ...dispo,
+            status: 'rejected', // Utilisation correcte du type
+            decisions: 'rejected',
+          };
+
+          setHasUnsavedChanges(true);
+          saveUnsavedChangesToStorage([...prev.filter((d) => d !== dispo), updatedDispo], true);
+
+          return updatedDispo;
         }
         return dispo;
       })
@@ -324,9 +374,10 @@ const EmployeesAvaibilities = () => {
     setSelectedCell(null);
   };
 
+
   const handleDelete = async (disponibilityId: string) => {
     try {
-      await axios.delete(`${URL_DISPO}/api/disponibilites/disponibilites/${disponibilityId}`, {
+      await axios.delete(`${AppURL}/api/disponibilites/disponibilites/${disponibilityId}`, {
         params: { dsp_code: user.dsp_code }, // Ajout de dsp_code dans la requête
       });
 
@@ -338,30 +389,43 @@ const EmployeesAvaibilities = () => {
     }
   };
 
-
   const handlePublish = async () => {
     try {
+      setIsPublishing(true); // Démarrer le chargement
+
+      // Extraire les décisions acceptées ou refusées
       const decisions = disponibilities
         .filter((dispo) => dispo.status === 'accepted' || dispo.status === 'rejected')
         .map((dispo) => ({
           employeeId: dispo.employeeId,
           selectedDay: dispo.selectedDay,
           shiftId: dispo.shiftId,
-          status: dispo.status, // Ensure to send accepted or rejected
+          status: dispo.status,
         }));
 
-      await axios.post(`${URL_DISPO}/api/disponibilites/updateDisponibilites`, { decisions, dsp_code: user.dsp_code });
+      // Envoyer les données au backend
+      await axios.post(`${AppURL}/api/disponibilites/updateDisponibilites`, {
+        decisions,
+        dsp_code: user.dsp_code,
+      });
+
+      // Supprimer les données locales après publication réussie
+      await AsyncStorage.removeItem('unsavedChanges');
+      await AsyncStorage.removeItem('hasUnsavedChanges');
+
+      // Réinitialiser l'état des modifications non publiées
+      setHasUnsavedChanges(false);
 
       Alert.alert('Success', 'The decisions have been successfully published.');
-      window.alert('The decisions have been successfully published.');
-      setAcceptedCount(0);
-      setRejectedCount(0);
     } catch (error) {
       Alert.alert('Error', 'An error occurred while publishing the decisions.');
-      window.alert('An error occurred while publishing the decisions.');
       console.error('Error publishing decisions:', error);
+    } finally {
+      setIsPublishing(false); // Arrêter le chargement
     }
   };
+
+
 
 
   return (
@@ -427,20 +491,35 @@ const EmployeesAvaibilities = () => {
 
 
 
-            <View style={styles.counterContainer}>
-              <Text style={styles.counterText}>
-                {user.language === 'English' ? `Accepted: ${acceptedCount}` : `Accepté: ${acceptedCount}`}
-              </Text>
-              <Text style={styles.counterText}>
-                {user.language === 'English' ? `Rejected: ${rejectedCount}` : `Rejeté: ${rejectedCount}`}
-              </Text>
-              <TouchableOpacity onPress={handlePublish} style={styles.publishButton}>
-                <Text style={styles.publishButtonText}>
-                  {user.language === 'English' ? 'Publish' : 'Publier'}
-                </Text>
+            <View style={[styles.counterContainer, { justifyContent: 'center', alignItems: 'center' }]}>
+              {hasUnsavedChanges && Platform.OS === 'web' && (
+                <View style={styles.unsavedChangesContainer}>
+                  <Text style={styles.unsavedChangesText}>
+                    {user.language === 'English'
+                      ? 'You have unsaved changes! Don\'t forget to publish.'
+                      : 'Vous avez des modifications non publiées ! N\'oubliez pas de publier.'}
+                  </Text>
+                </View>
+              )}
+              <TouchableOpacity
+                onPress={handlePublish}
+                style={[
+                  styles.publishButton,
+                  { backgroundColor: isPublishing ? '#ccc' : 'red' }, // Grise le bouton en cours de chargement
+                ]}
+                disabled={isPublishing} // Désactiver le bouton en cours de chargement
+              >
+                {isPublishing ? (
+                  <ActivityIndicator size="small" color="#fff" /> // Affiche le spinner
+                ) : (
+                  <Text style={styles.publishButtonText}>
+                    {user.language === 'English' ? 'Publish' : 'Publier'}
+                  </Text>
+                )}
               </TouchableOpacity>
 
             </View>
+
           </View>
 
           <View style={styles.shiftColorsContainer}>
@@ -736,6 +815,18 @@ const EmployeesAvaibilities = () => {
 export default EmployeesAvaibilities;
 
 const styles = StyleSheet.create({
+  unsavedChangesContainer: {
+    backgroundColor: '#ffcc00', // Jaune pour attirer l’attention
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  unsavedChangesText: {
+    color: '#001933', // Bleu foncé pour le texte
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+
   navButton: {
     backgroundColor: '#001933', // Bouton bleu foncé
     borderRadius: 50, // Arrondi complet pour un bouton circulaire
@@ -955,16 +1046,21 @@ const styles = StyleSheet.create({
     color: '#001933', // Texte bleu foncé
     fontSize: 16,
     fontWeight: 'bold',
+
+
   },
   publishButton: {
-    backgroundColor: 'red', // Bouton bleu foncé
+    backgroundColor: 'red', // Fond rouge pour le bouton
     padding: 10,
     borderRadius: 8,
+    width: '30%', // Augmentez la largeur ici (par exemple, 50% de la largeur parent)
+    alignSelf: 'center', // 
   },
   publishButtonText: {
     color: '#fff', // Texte blanc
     fontSize: 16,
     fontWeight: 'bold',
+    alignSelf: 'center',
   },
   table: {
     flex: 1,

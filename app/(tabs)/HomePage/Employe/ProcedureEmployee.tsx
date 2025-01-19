@@ -3,6 +3,7 @@ import { StyleSheet, Text, View, FlatList, TouchableOpacity, Modal, ActivityIndi
 import { useRoute } from '@react-navigation/native';
 import { FontAwesome } from '@expo/vector-icons';
 import axios from 'axios';
+import AppURL from '@/components/src/URL';
 
 type User = {
     _id: string;
@@ -31,13 +32,10 @@ type Procedure = {
 const ProcedureEmployee = () => {
     const route = useRoute();
     const { user } = route.params as { user: User };
-
     const [procedures, setProcedures] = useState<Procedure[]>([]);
     const [selectedProcedure, setSelectedProcedure] = useState<Procedure | null>(null);
     const [modalVisible, setModalVisible] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
-
-    const API_URL = 'https://coral-app-wqv9l.ondigitalocean.app/api/procedure';
 
     // Animation ref
     const blinkingAnim = useRef(new Animated.Value(1)).current;
@@ -63,7 +61,7 @@ const ProcedureEmployee = () => {
     useEffect(() => {
         const fetchProcedures = async () => {
             try {
-                const response = await axios.get<Procedure[]>(`${API_URL}?dsp_code=${user.dsp_code}`);
+                const response = await axios.get<Procedure[]>(`${AppURL}/api/procedure?dsp_code=${user.dsp_code}`);
                 setProcedures(response.data);
             } catch (err) {
                 console.error('Error fetching procedures:', err);
@@ -78,7 +76,7 @@ const ProcedureEmployee = () => {
     const handleProcedureClick = async (procedure: Procedure) => {
         try {
             if (!procedure.seen.includes(user._id)) {
-                await axios.put(`${API_URL}/${procedure._id}/seen?dsp_code=${user.dsp_code}`, { userId: user._id });
+                await axios.put(`${AppURL}/api/procedure/${procedure._id}/seen?dsp_code=${user.dsp_code}`, { userId: user._id });
                 setProcedures(prev =>
                     prev.map(proc => (proc._id === procedure._id ? { ...proc, seen: [...proc.seen, user._id] } : proc))
                 );
@@ -93,7 +91,7 @@ const ProcedureEmployee = () => {
     const handleRefresh = async () => {
         setIsLoading(true); // Démarre le chargement
         try {
-            const response = await axios.get<Procedure[]>(`${API_URL}?dsp_code=${user.dsp_code}`); // Requête pour récupérer les procédures
+            const response = await axios.get<Procedure[]>(`${AppURL}/api/procedure?dsp_code=${user.dsp_code}`); // Requête pour récupérer les procédures
             setProcedures(response.data); // Met à jour la liste
         } catch (err) {
             console.error('Error refreshing procedures:', err);

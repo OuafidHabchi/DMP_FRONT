@@ -14,9 +14,8 @@ import {
 } from 'react-native';
 import axios from 'axios';
 import { useRoute } from '@react-navigation/native';
+import AppURL from '@/components/src/URL';
 
-const URL_Employee = 'https://coral-app-wqv9l.ondigitalocean.app';
-const URL_Quiz = 'https://coral-app-wqv9l.ondigitalocean.app';
 
 type Employee = {
   _id: string;
@@ -67,8 +66,8 @@ const QuizManagement = () => {
 
   const fetchQuizData = async () => {
     try {
-      const quizzesResponse = await axios.get<Quiz[]>(`${URL_Quiz}/api/quiz?dsp_code=${user.dsp_code}`);
-      const employeesResponse = await axios.get<Employee[]>(`${URL_Employee}/api/employee?dsp_code=${user.dsp_code}`);
+      const quizzesResponse = await axios.get<Quiz[]>(`${AppURL}/api/quiz?dsp_code=${user.dsp_code}`);
+      const employeesResponse = await axios.get<Employee[]>(`${AppURL}/api/employee?dsp_code=${user.dsp_code}`);
 
       const quizzes = quizzesResponse.data;
       const allEmployees = employeesResponse.data;
@@ -122,7 +121,7 @@ const QuizManagement = () => {
     }
 
     try {
-      await axios.put(`${URL_Employee}/api/employee/profile/${selectedEmployee._id}?dsp_code=${user.dsp_code}`, {
+      await axios.put(`${AppURL}/api/employee/profile/${selectedEmployee._id}?dsp_code=${user.dsp_code}`, {
         quiz: true,
       });
       Alert.alert('Success', 'Quiz assigned to the employee');

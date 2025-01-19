@@ -3,6 +3,8 @@ import { StyleSheet, Text, View, FlatList, TouchableOpacity, Modal, Pressable, A
 import { useRoute } from '@react-navigation/native';
 import axios from 'axios';
 import { Platform } from 'react-native';
+import AppURL from '@/components/src/URL';
+
 
 type User = {
   _id: string;
@@ -28,8 +30,6 @@ type Vehicle = {
   license: string;
 };
 
-const URL_Fleet = 'https://coral-app-wqv9l.ondigitalocean.app';
-const URL_reportIssues = 'https://coral-app-wqv9l.ondigitalocean.app';
 
 const AllVans = () => {
   const route = useRoute();
@@ -65,7 +65,7 @@ const AllVans = () => {
   // Fonction pour gérer l'ajout du véhicule
   const handleAddVehicle = async () => {
     try {
-      const response = await axios.post(`${URL_Fleet}/api/vehicles/add?dsp_code=${user.dsp_code}`, newVehicle);
+      const response = await axios.post(`${AppURL}/api/vehicles/add?dsp_code=${user.dsp_code}`, newVehicle);
 
       if (response.status === 201) {
         setVehicles([...vehicles, response.data]); // Ajouter le véhicule
@@ -96,7 +96,7 @@ const AllVans = () => {
   const fetchVehicles = async () => {
     setLoading(true);
     try {
-      const response = await axios.get(`${URL_Fleet}/api/vehicles/all?dsp_code=${user.dsp_code}`);
+      const response = await axios.get(`${AppURL}/api/vehicles/all?dsp_code=${user.dsp_code}`);
       setVehicles(response.data.data);
       setError(null);
     } catch (error) {
@@ -134,11 +134,11 @@ const AllVans = () => {
       console.log('Attempting to delete vehicle with ID:', _id);
 
       // Supprimer l'élément principal (le véhicule)
-      await axios.delete(`${URL_Fleet}/api/vehicles/${_id}?dsp_code=${user.dsp_code}`);
+      await axios.delete(`${AppURL}/api/vehicles/${_id}?dsp_code=${user.dsp_code}`);
       console.log('Vehicle deleted successfully');
       // Essayer de supprimer les rapports associés (ignorer les erreurs si aucun rapport n'existe)
       try {
-        await axios.delete(`${URL_reportIssues}/api/reportIssues/van/${_id}?dsp_code=${user.dsp_code}`);
+        await axios.delete(`${AppURL}/api/reportIssues/van/${_id}?dsp_code=${user.dsp_code}`);
         console.log('Associated reports deleted successfully');
       } catch (reportError) {
         // Vérifiez si l'erreur est une erreur Axios
@@ -167,7 +167,7 @@ const AllVans = () => {
   const handleUpdate = async () => {
     if (selectedVehicle) {
       try {
-        await axios.put(`${URL_Fleet}/api/vehicles/${selectedVehicle._id}?dsp_code=${user.dsp_code}`, vehicleDetails);
+        await axios.put(`${AppURL}/api/vehicles/${selectedVehicle._id}?dsp_code=${user.dsp_code}`, vehicleDetails);
         setVehicles(vehicles.map(vehicle => vehicle._id === selectedVehicle._id ? { ...selectedVehicle, ...vehicleDetails } : vehicle));
         await fetchVehicles();
         setModalVisible(false);

@@ -13,9 +13,10 @@ import {
 } from 'react-native';
 import { BarChart, LineChart, PieChart } from 'react-native-chart-kit';
 import axios from 'axios';
-import { ResponsivePie } from '@nivo/pie';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRoute } from '@react-navigation/native';
+import AppURL from '@/components/src/URL';
+
 
 // Types
 type Employee = {
@@ -55,16 +56,9 @@ const WeeklyStatistics = () => {
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isModalVisible, setIsModalVisible] = useState<boolean>(false);
-
-
-  const URL_violation = 'https://coral-app-wqv9l.ondigitalocean.app/api/dailyViolations';
-  const URL_employee = 'https://coral-app-wqv9l.ondigitalocean.app/api/employee';
-
   const isValidDate = (date: any) => {
     return !isNaN(new Date(date).getTime());
   };
-
-
   // Calculate the current or next week
   const getWeekDates = (weekOffset = 0) => {
     const today = new Date();
@@ -85,7 +79,7 @@ const WeeklyStatistics = () => {
   // Fetch employees
   const fetchEmployees = async (): Promise<Employee[]> => {
     try {
-      const response = await axios.get<Employee[]>(`${URL_employee}?dsp_code=${user.dsp_code}`);
+      const response = await axios.get<Employee[]>(`${AppURL}/api/employee?dsp_code=${user.dsp_code}`);
       return response.data;
     } catch (error) {
       console.error('Error fetching employees:', error);
@@ -95,7 +89,7 @@ const WeeklyStatistics = () => {
 
   const fetchWeeklyViolations = async (startDate: string): Promise<Record<string, Record<string, number>>> => {
     try {
-      const response = await axios.get<Record<string, Record<string, number>>>(`${URL_violation}/violations/weekly?dsp_code=${user.dsp_code}`, {
+      const response = await axios.get<Record<string, Record<string, number>>>(`${AppURL}/api/dailyViolations/violations/weekly?dsp_code=${user.dsp_code}`, {
         params: { startDate },
       });
       return response.data;
@@ -107,7 +101,7 @@ const WeeklyStatistics = () => {
 
   const fetchEmployeeWeeklyViolations = async (startDate: string, employeeId: string): Promise<Record<string, Record<string, number>>> => {
     try {
-      const response = await axios.get<Record<string, Record<string, number>>>(`${URL_violation}/violations/employee-weekly?dsp_code=${user.dsp_code}`, {
+      const response = await axios.get<Record<string, Record<string, number>>>(`${AppURL}/api/dailyViolations/violations/employee-weekly?dsp_code=${user.dsp_code}`, {
         params: { startDay: startDate, idEmployee: employeeId },
       });
       if (!response.data) {

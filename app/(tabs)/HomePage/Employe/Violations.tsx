@@ -11,9 +11,8 @@ import {
 } from 'react-native';
 import axios from 'axios';
 import { useRoute } from '@react-navigation/native';
-import { MaterialIcons } from '@expo/vector-icons';
-
-const URL_violation = 'https://coral-app-wqv9l.ondigitalocean.app/api/dailyViolations';
+import { MaterialIcons } from '@expo/vector-icons'; 
+import AppURL from '@/components/src/URL';
 
 type Violation = {
     _id: string;
@@ -51,7 +50,7 @@ const Violations = () => {
         setLoading(true);
         setViolations([]);
         try {
-            const response = await axios.get<Violation[]>(`${URL_violation}/violations/employee-details?dsp_code=${user.dsp_code}`, {
+            const response = await axios.get<Violation[]>(`${AppURL}/api/dailyViolations/violations/employee-details?dsp_code=${user.dsp_code}`, {
                 params: { date: startDate, employeeId },
             });
 
@@ -73,7 +72,7 @@ const Violations = () => {
 
     const handleViolationPress = async (violation: Violation) => {
         try {
-            await axios.put(`${URL_violation}/${violation._id}?dsp_code=${user.dsp_code}`, {
+            await axios.put(`${AppURL}/api/dailyViolations/${violation._id}?dsp_code=${user.dsp_code}`, {
                 seen: true,
             });
 

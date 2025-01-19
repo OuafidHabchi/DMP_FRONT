@@ -7,9 +7,6 @@ import * as Sharing from 'expo-sharing';
 import { useRoute } from '@react-navigation/native';
 import AppURL from '@/components/src/URL';
 
-
-
-
 type Vehicle = {
     id: string; // Utilisé pour React
     _id?: string; // Optionnel pour les données provenant de la base de données
@@ -26,6 +23,7 @@ type Phone = {
     id: string;
     _id?: string; // Optionnel
     name: string;
+    comment?: string;
     exists: boolean;
     status: string;
 };
@@ -34,6 +32,7 @@ type Battery = {
     id: string;
     _id?: string; // Optionnel
     name: string;
+    comment?: string;
     exists: boolean;
     status: string;
 };
@@ -57,7 +56,8 @@ type InventoryItem = {
     _id?: string; // Champ optionnel pour indiquer les nouveaux éléments qui n'ont pas encore d'ID
     type: 'VEHICLE' | 'PHONE' | 'BATTERY';
     name: string;
-    status: string;
+    comment?: string;
+    status? : string;
     [key: string]: any; // Pour accepter d'autres champs comme 'key', 'exists', etc.
 };
 
@@ -136,9 +136,23 @@ const Inventory = () => {
     // Fonction de rafraîchissement
     const onRefresh = async () => {
         setRefreshing(true); // Démarre l'animation de rafraîchissement
-        await loadItems(); // Recharge les données
-        setRefreshing(false); // Arrête l'animation une fois terminé
+
+        try {
+            if (activeTab === 'VEHICLES') {
+                await fetchVehicles();
+            } else if (activeTab === 'PHONES') {
+                await fetchPhones();
+            } else if (activeTab === 'BATTERIES') {
+                await fetchBatteries();
+            }
+            await loadItems();
+        } catch (error) {
+            console.error('Error refreshing data:', error);
+        } finally {
+            setRefreshing(false); // Arrête l'animation une fois terminé
+        }
     };
+
 
 
     const fetchVehicles = async () => {
@@ -168,32 +182,33 @@ const Inventory = () => {
 
 
     const fetchPhones = async () => {
-        if (phones.length > 0) return; // Only fetch if state is empty
         try {
             const response = await fetch(`${AppURL}/api/phones/phones?dsp_code=${user.dsp_code}`);
-            const data = await response.json();
-            const formattedData = data.map((phone: any) => ({
+            const data = await response.json(); // Assurez-vous que cette ligne traite bien le JSON
+            const formattedPhones = data.map((phone: { _id: any; name: any; comment: any; exists: any; status: any; }) => ({
                 id: phone._id,
                 name: phone.name,
-                exists: false, // Default local state
-                status: '', // Default local state
+                comment: phone.comment || 'No comment', // Ajout d'un fallback
+                exists: phone.exists || false,
+                status: phone.status || '',
             }));
-            setPhones(formattedData);
+            setPhones(formattedPhones); // Met à jour l'état
         } catch (error) {
             console.error('Error fetching phones:', error);
         }
     };
 
+
     const fetchBatteries = async () => {
-        if (batteries.length > 0) return; // Only fetch if state is empty
         try {
             const response = await fetch(`${AppURL}/api/powerbanks/powerbanks?dsp_code=${user.dsp_code}`);
             const data = await response.json();
             const formattedData = data.map((battery: any) => ({
                 id: battery._id,
                 name: battery.name,
-                exists: false, // Default local state
-                status: '', // Default local state
+                comment: battery.comment || 'No comment', // Fallback si `comment` est absent
+                exists: battery.exists || false,
+                status: battery.status || '',
             }));
             setBatteries(formattedData);
         } catch (error) {
@@ -218,6 +233,7 @@ const Inventory = () => {
                 id: phone.id || phone._id, // Utilisez `_id` si `id` est manquant
                 type: 'PHONE' as const,
                 name: phone.name,
+                comment: phone.comment,
                 exists: phone.exists,
                 status: phone.status,
             })),
@@ -225,6 +241,7 @@ const Inventory = () => {
                 id: battery.id || battery._id, // Utilisez `_id` si `id` est manquant
                 type: 'BATTERY' as const,
                 name: battery.name,
+                comment: battery.comment,
                 exists: battery.exists,
                 status: battery.status,
             })),
@@ -332,7 +349,7 @@ const Inventory = () => {
             user.language === 'English'
                 ? 'Are you sure you want to delete all items?'
                 : 'Êtes-vous sûr de vouloir supprimer tous les articles ?';
-    
+
         const confirmation = Platform.OS === 'web'
             ? window.confirm(confirmationMessage)
             : await new Promise((resolve) => {
@@ -352,9 +369,9 @@ const Inventory = () => {
                     ]
                 );
             });
-    
+
         if (!confirmation) return;
-    
+
         try {
             setLoading(true); // Indique que les données sont en cours de suppression
             const response = await axios.delete(`${AppURL}/api/inventory/`, {
@@ -362,7 +379,7 @@ const Inventory = () => {
                     dsp_code: user.dsp_code, // Ajout de dsp_code
                 },
             });
-    
+
             if (response.data) {
                 Alert.alert(
                     user.language === 'English' ? 'Success' : 'Succès',
@@ -395,9 +412,9 @@ const Inventory = () => {
 
         const cleanedData = {
             vehicles: cleanData(vehicles),
-            phones: cleanData(phones),
-            batteries: cleanData(batteries),
-            userName: user.name + " " + user.familyName, // Nom de l'utilisateur
+            phones: cleanData(phones.map(phone => ({ ...phone, comment: phone.comment || '' }))),
+            batteries: cleanData(batteries.map(battery => ({ ...battery, comment: battery.comment || '' }))),
+            userName: `${user.name} ${user.familyName}`,
         };
 
         if (Platform.OS === 'web') {
@@ -512,6 +529,7 @@ const Inventory = () => {
         setResetCounter((prev) => prev + 1); // Force re-render
         setLoading(false); // Stop loading
     };
+
 
 
 
@@ -649,8 +667,20 @@ const Inventory = () => {
                         {user.language === 'English' ? (loading ? 'Clearing...' : 'Clear') : (loading ? 'Effacement...' : 'Effacer')}
                     </Text>
                 </Pressable>
+                {Platform.OS === "web" && (
+                    <Pressable
+                        style={[styles.refreshButton, refreshing && styles.disabledButton]}
+                        onPress={refreshing ? null : onRefresh}
+                    >
+                        <Text style={styles.buttonText}>
+                            {user.language === 'English' ? 'Refresh' : 'Rafraîchir'}
+                        </Text>
+                    </Pressable>
+
+                )}
+
             </View>
-            
+
 
             {selectedItem && (
                 <Modal visible transparent animationType="slide">
@@ -687,6 +717,15 @@ const Inventory = () => {
 export default Inventory;
 
 const styles = StyleSheet.create({
+    refreshButton: {
+        flex: 1,
+        marginHorizontal: 8,
+        padding: 12,
+        backgroundColor: '#007ACC', // Couleur bleue pour le bouton Refresh
+        borderRadius: 6,
+        alignItems: 'center',
+    },
+
     disabledButton: {
         backgroundColor: '#CCC', // Light gray to indicate disabled
     },

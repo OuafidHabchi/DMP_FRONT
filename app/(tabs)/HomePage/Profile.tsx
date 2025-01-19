@@ -2,8 +2,7 @@ import React, { useState } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, Modal, TextInput, Alert, ScrollView } from 'react-native';
 import { useRoute } from '@react-navigation/native';
 import axios from 'axios';
-
-const URL = 'https://coral-app-wqv9l.ondigitalocean.app'; // Ensure the correct URL
+import AppURL from '@/components/src/URL';
 
 // Define the type User
 type User = {
@@ -45,7 +44,7 @@ export default function Profile() {
     };
 
     try {
-      const response = await axios.put(`${URL}/api/employee/profile/${updatedUser._id}?dsp_code=${user.dsp_code}`, updatedUserData);
+      const response = await axios.put(`${AppURL}/api/employee/profile/${updatedUser._id}?dsp_code=${user.dsp_code}`, updatedUserData);
       const data = response.data;
 
       Alert.alert('Success', 'Information updated successfully.');

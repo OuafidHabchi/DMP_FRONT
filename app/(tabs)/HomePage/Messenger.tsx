@@ -5,9 +5,8 @@ import io from 'socket.io-client';
 import axios from 'axios';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../_layout';
+import AppURL from '@/components/src/URL';
 
-const URLConversation = 'http://192.168.12.12:3004';
-const URL = 'https://coral-app-wqv9l.ondigitalocean.app';
 
 type Sign_UpScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Sign_Up'>;
 
@@ -49,7 +48,7 @@ interface MessengerProps {
 
 export default function Messenger({ user, onUnreadStatusChange }: MessengerProps) {
 
-  const socket = io(`http://192.168.12.12:3004?dsp_code=${user.dsp_code}`);
+  const socket = io(`${AppURL}?dsp_code=${user.dsp_code}`);
 
   const navigation = useNavigation<Sign_UpScreenNavigationProp>();
   const route = useRoute();
@@ -71,7 +70,7 @@ export default function Messenger({ user, onUnreadStatusChange }: MessengerProps
 
     try {
       // Charger les employés disponibles
-      const response = await axios.get(`${URL}/api/employee?dsp_code=${user.dsp_code}`);
+      const response = await axios.get(`${AppURL}/api/employee?dsp_code=${user.dsp_code}`);
       const filteredEmployees = response.data.filter((emp: User) => !conversation.participants.includes(emp._id));
       setEmployees(filteredEmployees); // Met à jour les employés disponibles
       setSelectedConversation(conversation);
@@ -86,7 +85,7 @@ export default function Messenger({ user, onUnreadStatusChange }: MessengerProps
 
     try {
       const response = await axios.patch(
-        `${URLConversation}/api/conversations/${selectedConversation._id}/participants?dsp_code=${user.dsp_code}`,
+        `${AppURL}/api/conversations/conversations/${selectedConversation._id}/participants?dsp_code=${user.dsp_code}`,
         { newParticipants: selectedEmployees }
       );
 
@@ -133,7 +132,7 @@ export default function Messenger({ user, onUnreadStatusChange }: MessengerProps
   const fetchConversations = async () => {
     setRefreshing(true);
     try {
-      const response = await axios.get(`${URLConversation}/api/conversations/${user._id}?dsp_code=${user.dsp_code}`);
+      const response = await axios.get(`${AppURL}/api/conversations/conversations/${user._id}?dsp_code=${user.dsp_code}`);
       const conversationsData = response.data;
       setConversations(conversationsData);
 
@@ -156,7 +155,7 @@ export default function Messenger({ user, onUnreadStatusChange }: MessengerProps
       setRecipients(recipientNames);
 
       // Récupérer le statut des messages non lus
-      const unreadStatusResponse = await axios.get(`${URLConversation}/api/conversations/unreadStatus/${user._id}?dsp_code=${user.dsp_code}`);
+      const unreadStatusResponse = await axios.get(`${AppURL}/api/conversations/conversations/unreadStatus/${user._id}?dsp_code=${user.dsp_code}`);
       setUnreadConversations(unreadStatusResponse.data);
 
       // Déterminer s'il existe des messages non lus
@@ -177,7 +176,7 @@ export default function Messenger({ user, onUnreadStatusChange }: MessengerProps
 
   const fetchUserById = async (userId: string): Promise<User | null> => {
     try {
-      const response = await axios.get(`${URL}/api/employee/profile/${userId}?dsp_code=${user.dsp_code}`);
+      const response = await axios.get(`${AppURL}/api/employee/profile/${userId}?dsp_code=${user.dsp_code}`);
       return response.data;
     } catch (error) {
       console.error('Error fetching user details', error);
@@ -187,14 +186,25 @@ export default function Messenger({ user, onUnreadStatusChange }: MessengerProps
 
   const openNewConversation = async () => {
     try {
-      const response = await axios.get(`${URL}/api/employee?dsp_code=${user.dsp_code}`);
-      const filteredEmployees = response.data.filter((emp: User) => emp._id !== user._id);
+      const response = await axios.get(`${AppURL}/api/employee?dsp_code=${user.dsp_code}`);
+
+      // Filtrer les employés selon le rôle de l'utilisateur
+      const filteredEmployees = response.data.filter((emp: User) => {
+        // Si l'utilisateur n'est pas un driver, afficher tous les employés
+        if (user.role !== 'driver') {
+          return emp._id !== user._id; // Exclure uniquement lui-même
+        }
+        // Sinon, exclure les employés avec un rôle de driver
+        return emp._id !== user._id && emp.role !== 'driver';
+      });
+
       setEmployees(filteredEmployees);
       setModalVisible(true);
     } catch (error) {
       console.error('Error fetching employees', error);
     }
   };
+
 
   const toggleEmployeeSelection = (employeeId: string) => {
     setSelectedEmployees((prevSelected) =>
@@ -235,7 +245,7 @@ export default function Messenger({ user, onUnreadStatusChange }: MessengerProps
           isGroup,
           name: isGroup ? groupName : '',
         };
-        const response = await axios.post(`${URLConversation}/api/conversations?dsp_code=${user.dsp_code}`, conversationData);
+        const response = await axios.post(`${AppURL}/api/conversations/conversations?dsp_code=${user.dsp_code}`, conversationData);
         await fetchConversations();
 
         navigation.navigate('Chat', {
@@ -255,7 +265,7 @@ export default function Messenger({ user, onUnreadStatusChange }: MessengerProps
 
   const deleteConversation = async (conversationId: string) => {
     try {
-      await axios.delete(`${URLConversation}/api/conversations/${conversationId}?dsp_code=${user.dsp_code}`);
+      await axios.delete(`${AppURL}/api/conversations/conversations/${conversationId}?dsp_code=${user.dsp_code}`);
       await fetchConversations();
       setDeleteModalVisible(false);
     } catch (error) {
@@ -271,7 +281,7 @@ export default function Messenger({ user, onUnreadStatusChange }: MessengerProps
   const openConversation = async (conversation: Conversation) => {
     try {
       // First, mark messages as read in the backend
-      await axios.post(`${URLConversation}/api/messages/markAsRead?dsp_code=${user.dsp_code}`, {
+      await axios.post(`${AppURL}/api/messages/messages/markAsRead?dsp_code=${user.dsp_code}`, {
         conversationId: conversation._id,
         userId: user._id,
       });

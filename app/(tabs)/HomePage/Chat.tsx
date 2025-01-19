@@ -11,17 +11,15 @@ import AutoLink from 'react-native-autolink';
 import ImageViewer from 'react-native-image-zoom-viewer'; // Import the library
 import { Video, ResizeMode } from 'expo-av'; // Si vous utilisez des vidéos avec Expo
 import * as DocumentPicker from 'expo-document-picker';
-import * as MediaLibrary from 'expo-media-library';
-
+import * as ImageManipulator from 'expo-image-manipulator';
+import AppURL from '@/components/src/URL';
+import RNFS from 'react-native-fs';
+import * as Sharing from 'expo-sharing';
 
 
 const windowHeight = Dimensions.get('window').height;
-
 // Initialize the socket
-const socket = io('http://192.168.12.12:3004');
-const URLEMployees = 'https://coral-app-wqv9l.ondigitalocean.app';
-const URLConversation = 'http://192.168.12.12:3004';
-
+const socket = io(AppURL);
 // Message type definition
 interface Message {
   _id: string;
@@ -68,10 +66,12 @@ export default function Chat() {
   const [isModalVisible, setModalVisible] = useState(false);
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null)
   const [isVideo, setIsVideo] = useState(false);
-  
+  const [isSending, setIsSending] = useState(false);
+
+
 
   useEffect(() => {
-    const socket = io(`http://192.168.12.12:3004`, {
+    const socket = io(`${AppURL}`, {
       query: { dsp_code: user.dsp_code }, // Remplacez par une valeur valide
     });
     // Fetch initial data once
@@ -99,7 +99,6 @@ export default function Chat() {
 
   useEffect(() => {
     if (participants.length > 0) {
-      console.log('Updated participants:', participants); // Log updated participants after state change
     }
   }, [participants]);
 
@@ -128,7 +127,7 @@ export default function Chat() {
   // Fetch messages from the conversation
   const fetchMessages = async () => {
     try {
-      const response = await axios.get(`http://192.168.12.12:3004/api/messages/${conversationId}?dsp_code=${user.dsp_code}`);
+      const response = await axios.get(`${AppURL}/api/messages/messages/${conversationId}?dsp_code=${user.dsp_code}`);
       setMessages(response.data);
       if (Platform.OS === 'web') {
         scrollViewRef.current?.scrollToEnd({ animated: true }); // Scroll to the bottom on web
@@ -149,7 +148,7 @@ export default function Chat() {
       if (otherParticipantIds.length === 0) return; // Check if there are participants to fetch
 
       // Make a single request with all participant IDs
-      const response = await axios.post(`${URLEMployees}/api/employee/by-ids?dsp_code=${user.dsp_code}`, { // URL is fine with backticks
+      const response = await axios.post(`${AppURL}/api/employee/by-ids?dsp_code=${user.dsp_code}`, { // URL is fine with backticks
         ids: otherParticipantIds // Send the IDs as data in the POST request
       });
       // Update the state with the fetched participant data
@@ -188,13 +187,11 @@ export default function Chat() {
         // Generate a URL for previewing or uploading
         const videoUrl = URL.createObjectURL(videoBlob);
         setFileUri(videoUrl); // For preview in the UI
-        console.log("Processed video URL:", videoUrl);
 
         // If needed, append videoFile to FormData for uploading
       } else {
         // Directly use the URI for mobile platforms
         setFileUri(videoUri);
-        console.log("Processed video URL mobile:", videoUri);
       }
     }
   };
@@ -203,24 +200,32 @@ export default function Chat() {
 
   // Fonction pour choisir un fichier
   const pickPicture = async () => {
-    let permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (permissionResult.granted === false) {
+    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permissionResult.granted) {
       alert("Permission d'accès à la galerie requise !");
       return;
     }
 
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.All,
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       quality: 1,
     });
 
     if (!result.canceled && result.assets && result.assets.length > 0) {
-      setFileUri(result.assets[0].uri); // Stockez l'URI du fichier sélectionné
+      try {
+        const manipulatedImage = await ImageManipulator.manipulateAsync(
+          result.assets[0].uri,
+          [{ resize: { width: 500 } }], // Redimensionne à une largeur maximale de 800px
+          { compress: 0.5, format: ImageManipulator.SaveFormat.JPEG } // Compression à 70%
+        );
+
+        setFileUri(manipulatedImage.uri); // Stocker l'URI compressée
+      } catch (error) {
+        console.error("Erreur lors de la compression de l'image :", error);
+      }
     }
   };
-
-
 
   // Fonction pour choisir un fichier (PDF, Word, etc.)
   const pickFile = async () => {
@@ -236,55 +241,41 @@ export default function Chat() {
         // Traitez le fichier comme nécessaire, par exemple, le stocker dans l'état
         setFileUri(uri);
       } else {
-        console.log('Sélection de fichier annulée ou aucun fichier trouvé');
       }
     } catch (error) {
       console.error('Erreur lors de la sélection du fichier:', error);
     }
   };
 
+
   const downloadPdf = async (fileUrl: string) => {
     if (Platform.OS === 'web') {
-      downloadPdfWeb(fileUrl);
+      // Utilise la fonction pour le web
+      await downloadPdfWeb(fileUrl);
     } else {
-      const fileName = fileUrl.split('/').pop() ?? 'download.pdf';
-      const downloadPath = `${FileSystem.cacheDirectory}${fileName}`;
+      // Utilise la fonction pour le mobile
+      const fileName = fileUrl.split('/').pop() || 'download.pdf';
+      const downloadPath = `${FileSystem.documentDirectory}${fileName}`;
 
       try {
-        // Download the file to the cache directory
         const { uri } = await FileSystem.downloadAsync(fileUrl, downloadPath);
-        // Move the file to the document directory for better access
-        const movedUri = `${FileSystem.documentDirectory}${fileName}`;
-        await FileSystem.moveAsync({ from: uri, to: movedUri });
-
-        // Check if the file exists
-        const fileInfo = await FileSystem.getInfoAsync(movedUri);
+        const fileInfo = await FileSystem.getInfoAsync(uri);
         if (!fileInfo.exists) {
-          throw new Error('Moved file does not exist or is inaccessible.');
+          throw new Error('File does not exist after download.');
         }
-
-        // Request permissions to save the file to the media library
-        const { status } = await MediaLibrary.requestPermissionsAsync();
-        if (status !== 'granted') {
-          Alert.alert('Permission Denied', 'Storage permissions are required to save the file.');
-          return;
-        }
-
-        // Save the file directly to the library
-        await MediaLibrary.saveToLibraryAsync(movedUri);
-        Alert.alert('Download Complete', 'File has been saved to your library.');
-
-      } catch (error) {
-        if (error instanceof Error) {
-          console.error('Download error:', error.message);
-          Alert.alert('Error', `An error occurred while saving the file: ${error.message}`);
+        // Share the downloaded file
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(uri);
         } else {
-          console.error('Download error:', error);
-          Alert.alert('Error', 'An unexpected error occurred.');
+          Alert.alert('Error', 'Sharing is not available on this device.');
         }
+      } catch (error: any) {
+        console.error('Download error:', error.message || error);
+        Alert.alert('Error', 'An error occurred while downloading or sharing the file.');
       }
     }
   };
+
 
   // Function for force downloading a PDF using Blob
   const downloadPdfWeb = async (fileUrl: string) => {
@@ -292,7 +283,6 @@ export default function Chat() {
       const response = await fetch(fileUrl);
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
-
       const link = document.createElement('a');
       link.href = url;
       link.download = fileUrl.split('/').pop() ?? 'download.pdf';
@@ -314,7 +304,7 @@ export default function Chat() {
   // Fonction pour envoyer des messages (texte et/ou fichier - image, vidéo ou document)
   const sendMessage = async () => {
     if (!message.trim() && !fileUri) return; // Quitte si aucun message ou fichier n'est fourni
-
+    setIsSending(true); // Démarrer le chargement
     // Création des données du message
     const messageData = {
       conversationId,
@@ -331,8 +321,6 @@ export default function Chat() {
 
     // Ajout du fichier s'il est présent
     if (fileUri) {
-      // console.log("fileUri :"+fileUri) ;
-
       try {
         if (Platform.OS === 'web') {
           // Gérer les URIs de type 'blob:' pour les images, vidéos et documents
@@ -361,8 +349,10 @@ export default function Chat() {
             const fileName = `upload-${Date.now()}.${fileType}`;
             formData.append('file', new File([fileBlob], fileName, { type: mimeType }));
           } else {
+            setIsSending(false); // Arrêter le chargement en cas d'erreur
             console.error('URI non pris en charge:', fileUri);
             alert(`URI non pris en charge: ${fileUri}`);
+
             return; // Quitte si l'URI n'est pas pris en charge
           }
         }
@@ -393,38 +383,42 @@ export default function Chat() {
 
         }
       } catch (error) {
-        console.error('Erreur lors de la préparation du fichier pour l\'envoi:', error);
+        setIsSending(false); // Arrêter le chargement en cas d'erreur
+        // console.error('Erreur lors de la préparation du fichier pour l\'envoi:', error);
         return; // Quitte s'il y a une erreur de préparation du fichier
       }
     }
-
     try {
       // Log les données du FormData avant l'envoi
       formData.forEach((value, key) => {
-        console.log(`${key}: ${value}`);
       });
 
-      const response = await fetch(`http://192.168.12.12:3004/api/messages/upload?dsp_code=${user.dsp_code}`, {
+      const response = await fetch(`${AppURL}/api/messages/messages/upload?dsp_code=${user.dsp_code}`, {
         method: 'POST',
         body: formData,
       });
 
       if (!response.ok) {
         console.error("Request failed:", response.statusText);
+        setIsSending(false); // Arrêter le chargement en cas d'erreur
+
       }
 
-      if (response.status===201) {
+      if (response.status === 201) {
+        setIsSending(false); // Arrêter le chargement en cas d'erreur
         const savedMessage = await response.json();
         socket.emit('newMessage', savedMessage); // Émission du nouveau message via Socket.IO
         setMessage(''); // Réinitialisation du champ de message
         setFileUri(null); // Réinitialisation de l'URI du fichier
       } else {
-        console.error('Échec de l\'envoi du message:', response.status, response.statusText);
+        setIsSending(false); // Arrêter le chargement en cas d'erreur
+        // console.error('Échec de l\'envoi du message:', response.status, response.statusText);
       }
     } catch (error) {
+      setIsSending(false); // Arrêter le chargement en cas d'erreur
       console.error('Erreur lors de l\'envoi du message:', error);
       if (error instanceof Error) {
-        console.error('Message d\'erreur:', error.message);
+        // console.error('Message d\'erreur:', error.message);
       }
     }
   };
@@ -489,30 +483,28 @@ export default function Chat() {
 
                       {item.fileUrl && (
                         item.fileUrl.endsWith('.mp4') || item.fileUrl.endsWith('.mov') ? (
-                          <Pressable onPress={() => onMediaClick(`http://192.168.12.12:3004${item.fileUrl}?dsp_code=${user.dsp_code}`, true)}>
-                            <Video
-                              source={{ uri: `http://192.168.12.12:3004${item.fileUrl}?dsp_code=${user.dsp_code}` }}
-                              style={{ width: 100, height: 100, borderRadius: 10 }}
-                              useNativeControls
-                              resizeMode={ResizeMode.CONTAIN}
-                              shouldPlay={false}
-                              onError={(error) => console.log('Video playback error:', error)}
-                            />
-                          </Pressable>
 
+                          <Video
+                            source={{ uri: `${AppURL}${item.fileUrl}?dsp_code=${user.dsp_code}` }}
+                            style={{ width: 150, height: 100, borderRadius: 10 }}
+                            useNativeControls
+                            resizeMode={ResizeMode.CONTAIN}
+                            shouldPlay={false}
+                            onError={(error) => console.log('Video playback error:', error)}
+                          />
 
                         ) : item.fileUrl.endsWith('.pdf') ? (
-                          <Pressable onPress={() => downloadPdf(`http://192.168.12.12:3004${item.fileUrl}?dsp_code=${user.dsp_code}`)} >
+                          <Pressable onPress={() => downloadPdf(`${AppURL}${item.fileUrl}?dsp_code=${user.dsp_code}`)} >
                             <Image
-                              source={{ uri: `http://192.168.12.12:3004${item.fileUrl}?dsp_code=${user.dsp_code}` }} // Thumbnail placeholder
+                              source={{ uri: `${AppURL}${item.fileUrl}?dsp_code=${user.dsp_code}` }} // Thumbnail placeholder
                               style={{ width: 30, height: 10, borderRadius: 10 }}
                             />
                             <Text style={{ textAlign: 'center', color: 'blue' }}>Download PDF</Text>
                           </Pressable>
                         ) : (
-                          <Pressable onPress={() => onMediaClick(`http://192.168.12.12:3004${item.fileUrl}?dsp_code=${user.dsp_code}`, false)}>
+                          <Pressable onPress={() => onMediaClick(`${AppURL}${item.fileUrl}?dsp_code=${user.dsp_code}`, false)}>
                             <Image
-                              source={{ uri: `http://192.168.12.12:3004${item.fileUrl}?dsp_code=${user.dsp_code}` }}
+                              source={{ uri: `${AppURL}${item.fileUrl}?dsp_code=${user.dsp_code}` }}
                               style={{ width: 100, height: 100, borderRadius: 10 }}
                             />
                           </Pressable>
@@ -535,18 +527,22 @@ export default function Chat() {
 
 
           {selectedImageUri && (
-            <Modal visible={isModalVisible} transparent={true} animationType="slide" onRequestClose={() => setModalVisible(false)}>
+            <Modal
+              visible={isModalVisible}
+              transparent={true}
+              animationType="slide"
+              onRequestClose={() => setModalVisible(false)}
+            >
               {selectedImageUri.endsWith('.mp4') || selectedImageUri.endsWith('.mov') ? (
-                <View style={styles.modalContainer}>
+                <View style={[styles.modalContainer, { backgroundColor: 'rgba(0, 0, 0, 0.9)' }]}>
                   <Video
                     source={{ uri: selectedImageUri }}
-                    style={{ width: "90%", height: "90%" }}
-                    useNativeControls
+                    style={{ width: 300, height: 200 }} // Dimensions fixes pour un rendu cohérent
+                    useNativeControls={true}
                     resizeMode={ResizeMode.CONTAIN}
                     shouldPlay={true}
                     onError={(error) => {
-                      console.log('Video playback error in modal:', error);
-                      Alert.alert('Error', 'Unable to play the video.');
+                      Alert.alert('Erreur', 'Impossible de lire la vidéo. Veuillez réessayer.');
                     }}
                   />
                   <Pressable style={styles.closeButton} onPress={() => setModalVisible(false)}>
@@ -554,7 +550,7 @@ export default function Chat() {
                   </Pressable>
                 </View>
               ) : selectedImageUri.endsWith('.pdf') ? (
-                <View style={styles.modalContainer}>
+                <View style={[styles.modalContainer, { backgroundColor: 'rgba(0, 0, 0, 0.8)' }]}>
                   <Pressable onPress={() => downloadPdfWeb(selectedImageUri)} style={styles.downloadContainer}>
                     <Text style={styles.downloadText}>
                       {user.language === 'English' ? 'Click to Download PDF' : 'Cliquez pour télécharger le PDF'}
@@ -578,6 +574,7 @@ export default function Chat() {
               )}
             </Modal>
           )}
+
 
 
 
@@ -627,17 +624,24 @@ export default function Chat() {
               onContentSizeChange={(event) => setInputHeight(event.nativeEvent.contentSize.height)}
             />
             <Pressable
-              style={({ pressed }) => [
+              style={[
                 styles.sendButton,
-                { opacity: pressed ? 0.7 : 1 }  // Applique l'effet d'opacité sur mobile
+                { opacity: isSending ? 0.5 : 1 },
               ]}
-              onPress={sendMessage}
-              android_ripple={{ color: 'rgba(0, 0, 255, 0.3)' }} // Effet ripple pour Android
+              onPress={isSending ? null : sendMessage} // Désactiver le clic pendant l'envoi
+              disabled={isSending}
             >
-              <Text style={styles.sendButtonText}>
-                {user.language === 'English' ? 'Send' : 'Envoyer'}
-              </Text>
+              {isSending ? (
+                <Text style={styles.sendButtonText}>
+                  {user.language === 'English' ? 'Sending...' : 'Envoi...'}
+                </Text>
+              ) : (
+                <Text style={styles.sendButtonText}>
+                  {user.language === 'English' ? 'Send' : 'Envoyer'}
+                </Text>
+              )}
             </Pressable>
+
           </View>
         </View>
       )}
@@ -685,9 +689,9 @@ export default function Chat() {
                       {item.fileUrl && (
 
                         item.fileUrl.endsWith('.mp4') || item.fileUrl.endsWith('.mov') ? (
-                          <Pressable onPress={() => onMediaClick(`http://192.168.12.12:3004${item.fileUrl}?dsp_code=${user.dsp_code}`, true)}>
+                          <Pressable onPress={() => onMediaClick(`${AppURL}${item.fileUrl}?dsp_code=${user.dsp_code}`, true)}>
                             <video
-                              src={`http://192.168.12.12:3004${item.fileUrl}?dsp_code=${user.dsp_code}`}
+                              src={`${AppURL}${item.fileUrl}?dsp_code=${user.dsp_code}`}
                               controls
                               style={{ width: 200, height: 200, borderRadius: 10 }}
                             >
@@ -695,17 +699,17 @@ export default function Chat() {
                             </video>
                           </Pressable>
                         ) : item.fileUrl.endsWith('.pdf') ? (
-                          <Pressable onPress={() => downloadPdf(`http://192.168.12.12:3004${item.fileUrl}?dsp_code=${user.dsp_code}`)}>
+                          <Pressable onPress={() => downloadPdf(`${AppURL}${item.fileUrl}?dsp_code=${user.dsp_code}`)}>
                             <Image
-                              source={{ uri: 'https://example.com/path-to-your-pdf-thumbnail.png' }} // Optional thumbnail for PDF
+                              source={{ uri: `${AppURL}${item.fileUrl}?dsp_code=${user.dsp_code}` }} // Optional thumbnail for PDF
                               style={{ width: 50, height: 10, borderRadius: 10 }}
                             />
                             <Text style={{ textAlign: 'center', marginTop: 5, color: 'blue' }}>Download PDF</Text>
                           </Pressable>
                         ) : (
-                          <Pressable onPress={() => onMediaClick(`http://192.168.12.12:3004${item.fileUrl}?dsp_code=${user.dsp_code}`, false)}>
+                          <Pressable onPress={() => onMediaClick(`${AppURL}${item.fileUrl}?dsp_code=${user.dsp_code}`, false)}>
                             <Image
-                              source={{ uri: `http://192.168.12.12:3004${item.fileUrl}?dsp_code=${user.dsp_code}` }}
+                              source={{ uri: `${AppURL}${item.fileUrl}?dsp_code=${user.dsp_code}` }}
                               style={{ width: 200, height: 200, borderRadius: 10 }}
                             />
                           </Pressable>
@@ -817,16 +821,24 @@ export default function Chat() {
               onContentSizeChange={(event) => setInputHeight(event.nativeEvent.contentSize.height)}
             />
             <Pressable
-              style={({ pressed }) => [
+              style={[
                 styles.sendButton,
-                { opacity: pressed ? 0.4 : 1 }  // Applique l'effet d'opacité sur web
+                { opacity: isSending ? 0.5 : 1 },
               ]}
-              onPress={sendMessage}
+              onPress={isSending ? null : sendMessage} // Désactiver le clic pendant l'envoi
+              disabled={isSending}
             >
-              <Text style={styles.sendButtonText}>
-                {user.language === 'English' ? 'Send' : 'Envoyer'}
-              </Text>
+              {isSending ? (
+                <Text style={styles.sendButtonText}>
+                  {user.language === 'English' ? 'Sending...' : 'Envoi...'}
+                </Text>
+              ) : (
+                <Text style={styles.sendButtonText}>
+                  {user.language === 'English' ? 'Send' : 'Envoyer'}
+                </Text>
+              )}
             </Pressable>
+
           </View>
         </View>
       )}

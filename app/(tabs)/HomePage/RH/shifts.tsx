@@ -3,9 +3,8 @@ import { StyleSheet, Text, View, FlatList, Modal, TextInput, TouchableOpacity, P
 import { Picker } from '@react-native-picker/picker';
 import axios from 'axios';
 import { useRoute } from '@react-navigation/native';
-
-const URL = 'https://coral-app-wqv9l.ondigitalocean.app'; // Replace with your backend URL
-const URLDispo = 'https://coral-app-wqv9l.ondigitalocean.app'; // Replace with your backend URL
+import AppURL from '@/components/src/URL';
+import PickerModal from '@/components/src/PickerModal';
 
 const colors = [
   { label: 'Red', value: '#FF6B6B' },
@@ -63,7 +62,7 @@ const Shifts = () => {
 
   const fetchShifts = async () => {
     try {
-      const response = await axios.get(`${URL}/api/shifts/shifts`, {
+      const response = await axios.get(`${AppURL}/api/shifts/shifts`, {
         params: { dsp_code: user.dsp_code },
       });
       setShifts(response.data);
@@ -78,7 +77,7 @@ const Shifts = () => {
       return;
     }
     try {
-      const response = await axios.post(`${URL}/api/shifts/shifts`, {
+      const response = await axios.post(`${AppURL}/api/shifts/shifts`, {
         ...newShift,
         dsp_code: user.dsp_code, // Ajout de dsp_code
       });
@@ -95,7 +94,7 @@ const Shifts = () => {
   const handleUpdateShift = async () => {
     if (!selectedShift) return;
     try {
-      const response = await axios.put(`${URL}/api/shifts/shifts/${selectedShift._id}`, {
+      const response = await axios.put(`${AppURL}/api/shifts/shifts/${selectedShift._id}`, {
         ...selectedShift,
         dsp_code: user.dsp_code, // Ajout de dsp_code
       });
@@ -113,7 +112,7 @@ const Shifts = () => {
     try {
       // Supprimer les disponibilités avec dsp_code
       try {
-        await axios.delete(`${URLDispo}/api/disponibilites/disponibilites/shift/${id}`, {
+        await axios.delete(`${AppURL}/api/disponibilites/disponibilites/shift/${id}`, {
           data: { dsp_code: user.dsp_code }, // Ajout de dsp_code
         });
       } catch (error) {
@@ -121,7 +120,7 @@ const Shifts = () => {
       }
 
       // Supprimer le shift avec dsp_code
-      await axios.delete(`${URL}/api/shifts/shifts/${id}`, {
+      await axios.delete(`${AppURL}/api/shifts/shifts/${id}`, {
         data: { dsp_code: user.dsp_code }, // Ajout de dsp_code
       });
 
@@ -199,11 +198,15 @@ const Shifts = () => {
               value={newShift.endtime}
               onChangeText={text => setNewShift({ ...newShift, endtime: text })}
             />
-            <View style={styles.pickerContainer}>
-              <Picker selectedValue={newShift.color} style={styles.picker} onValueChange={value => setNewShift({ ...newShift, color: value })}>
-                {colors.map(color => <Picker.Item key={color.value} label={color.label} value={color.value} />)}
-              </Picker>
-            </View>
+            <PickerModal
+              title="Select Color" // Titre ou placeholder
+              options={colors.map(color => ({ label: color.label, value: color.value }))} // Transformation des données
+              selectedValue={newShift.color} // Valeur actuelle sélectionnée
+              onValueChange={(value) =>
+                setNewShift({ ...newShift, color: value })
+              }
+            />
+
             <View style={styles.switchContainer}>
               <Text style={[
                 styles.switchLabel,
@@ -257,11 +260,15 @@ const Shifts = () => {
                 onChangeText={text => setSelectedShift({ ...selectedShift, endtime: text })}
                 placeholder={user.language === 'English' ? 'End Time' : 'Heure de fin'}
               />
-              <View style={styles.pickerContainer}>
-                <Picker selectedValue={selectedShift.color} style={styles.picker} onValueChange={value => setSelectedShift({ ...selectedShift, color: value })}>
-                  {colors.map(color => <Picker.Item key={color.value} label={color.label} value={color.value} />)}
-                </Picker>
-              </View>
+              <PickerModal
+                title="Select Color" // Titre ou placeholder pour le bouton / modal
+                options={colors.map(color => ({ label: color.label, value: color.value }))} // Transformation des données
+                selectedValue={selectedShift.color} // Valeur actuellement sélectionnée
+                onValueChange={(value) =>
+                  setSelectedShift({ ...selectedShift, color: value })
+                }
+              />
+
               <View style={styles.switchContainer}>
                 <Text style={[
                   styles.switchLabel,

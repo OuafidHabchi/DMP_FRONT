@@ -15,6 +15,8 @@ import axios from "axios";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useRoute } from '@react-navigation/native';
 import AppURL from "@/components/src/URL";
+import { Image, Modal } from "react-native";
+
 
 // Define the type User
 type User = {
@@ -37,6 +39,7 @@ type TimeCard = {
     day: string;
     CortexDuree?: string;
     CortexEndTime?: string;
+    image?: String;
 };
 
 type Employee = {
@@ -65,6 +68,127 @@ const CortexPrediction: React.FC = () => {
     const [isSavingAll, setIsSavingAll] = useState<boolean>(false);
     const [savingEmployee, setSavingEmployee] = useState<Record<string, boolean>>({}); // Add this state
     const [refreshing, setRefreshing] = useState<boolean>(false); // State for mobile pull-to-refresh
+    const [isPhotoModalVisible, setPhotoModalVisible] = useState(false);
+    const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
+    const [selectedImage, setSelectedImage] = useState<string | null>(null);
+    const [isSavingPhoto, setIsSavingPhoto] = useState(false);
+
+    const handleSelectEmployee = async (employeeId: string) => {
+        setSelectedEmployeeId(employeeId);
+        setPhotoModalVisible(true);
+        const timeCard = timeCards.find((tc) => tc.employeeId === employeeId);
+
+        // Vérifie si le timeCard contient une image
+        if (timeCard?.image) {
+            try {
+                const imageURL = `${AppURL}/uploads-timecard${timeCard.image}`;
+                // Optionnel : Vous pouvez effectuer une requête pour vérifier si l'image existe
+                const response = await fetch(imageURL);
+                if (response.ok) {
+                    setSelectedImage(imageURL);
+                } else {
+                    setSelectedImage(null);
+                    Alert.alert(
+                        user.language === "English" ? "Image not found" : "Image introuvable"
+                    );
+                }
+            } catch (error) {
+                console.error("Error fetching image:", error);
+                Alert.alert(
+                    user.language === "English" ? "Failed to load image" : "Échec du chargement de l'image"
+                );
+            }
+        } else {
+            // Si aucune image n'est associée
+            setSelectedImage(null);
+        }
+    };
+
+
+
+
+
+    const handlePaste = (event: ClipboardEvent) => {
+        const clipboardData = event.clipboardData;
+        if (!clipboardData) return;
+
+        const items = clipboardData.items;
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            if (item.type.startsWith("image/")) {
+                const file = item.getAsFile();
+                if (file) {
+                    const imageUrl = URL.createObjectURL(file);
+                    setSelectedImage(imageUrl);
+                    break;
+                }
+            }
+        }
+    };
+
+
+
+    const savePhoto = async () => {
+        if (!selectedEmployeeId || !selectedImage) {
+            Alert.alert(
+                user.language === "English" ? "No employee or image selected" : "Aucun employé ou image sélectionné"
+            );
+            return;
+        }
+
+        const timeCard = timeCards.find((tc) => tc.employeeId === selectedEmployeeId);
+        if (!timeCard) {
+            Alert.alert(
+                user.language === "English" ? "No time card found for this employee." : "Aucune fiche de temps trouvée pour cet employé."
+            );
+            return;
+        }
+
+        const formData = new FormData();
+        try {
+            const response = await fetch(selectedImage);
+            const fileBlob = await response.blob();
+
+            // Extract the file extension from the MIME type
+            const mimeType = fileBlob.type; // e.g., "image/jpeg"
+            const extension = mimeType.split("/")[1]; // e.g., "jpeg"
+
+            const fileName = `file-${Date.now()}.${extension}`;
+
+            formData.append("photo", new File([fileBlob], fileName, { type: mimeType }));
+        } catch (error) {
+            console.error("Error processing the image:", error);
+            Alert.alert("Error", "Failed to process the image.");
+            return;
+        }
+
+        try {
+            const response = await axios.post(
+                `${AppURL}/api/timecards/timecards/${timeCard._id}/upload-image?dsp_code=${user.dsp_code}`,
+                formData,
+                {
+                    headers: {
+                        "Content-Type": "multipart/form-data",
+                    },
+                }
+            );
+
+            if (response.status === 200) {
+                Alert.alert("Success", "Photo saved successfully!");
+                setPhotoModalVisible(false);
+                setSelectedImage(null);
+            } else {
+                Alert.alert("Error", "Failed to save the photo.");
+            }
+        } catch (error) {
+            console.error("Error saving photo:", error);
+            Alert.alert("Error", "An unexpected error occurred.");
+        }
+    };
+
+
+
+
 
 
 
@@ -232,7 +356,21 @@ const CortexPrediction: React.FC = () => {
         const employee = employees[item.employeeId];
         return (
             <View style={styles.row}>
-                <Text style={styles.cell}>{employee ? `${employee.name} ${employee.familyName}` : "Unknown"}</Text>
+                {Platform.OS === 'web' && (
+                    <TouchableOpacity
+                        onPress={() => handleSelectEmployee(item.employeeId)}
+                    >
+                        <View style={styles.row}>
+                            <Text style={styles.cell}>{employee ? `${employee.name} ${employee.familyName}` : "Unknown"}</Text>
+                        </View>
+                    </TouchableOpacity>
+                )}
+                {Platform.OS !== 'web' && (
+                        <Text style={styles.cell}>{employee ? `${employee.name} ${employee.familyName}` : "Unknown"}</Text>
+                )}
+
+
+
                 <TextInput
                     style={styles.input}
                     placeholder={user.language === 'English' ? "The duration of the trip" : "La durée du trajet"}
@@ -320,6 +458,76 @@ const CortexPrediction: React.FC = () => {
                 }
             />
 
+            <Modal visible={isPhotoModalVisible} transparent={true} animationType="slide">
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContainer}>
+                        <Text style={styles.modalTitle}>
+                            {user.language === "English" ? "Upload Photo" : "Télécharger une photo"}
+                        </Text>
+
+                        {/* Vérifier et afficher soit l'image associée, soit celle sélectionnée */}
+                        {selectedImage ? (
+                            <Image source={{ uri: selectedImage }} style={styles.imagePreview} />
+                        ) : selectedEmployeeId &&
+                            timeCards.find((tc) => tc.employeeId === selectedEmployeeId)?.image ? (
+                            <Image
+                                source={{
+                                    uri: `${AppURL}/uploads-timecard${timeCards.find((tc) => tc.employeeId === selectedEmployeeId)?.image}`,
+                                }}
+                                style={styles.imagePreview}
+                            />
+
+                        ) : (
+                            <Text style={styles.modalText}>
+                                {user.language === "English" ? "No image available" : "Aucune image disponible"}
+                            </Text>
+                        )}
+
+                        {/* Paste Zone for Web */}
+                        {Platform.OS === "web" && (
+                            <div
+                                style={{
+                                    width: "50%",
+                                    height: 100,
+                                    borderWidth: 1,
+                                    borderColor: "#ccc",
+                                    borderRadius: 8,
+                                    backgroundColor: "#f0f0f0",
+                                    padding: 8,
+                                    marginBottom: 16,
+                                }}
+                                onPaste={(e) => handlePaste(e.nativeEvent as ClipboardEvent)}
+                            >
+                                <Text style={{ color: "#333" }}>
+                                    {user.language === "English"
+                                        ? "Paste your image here (Ctrl+V)"
+                                        : "Collez votre image ici (Ctrl+V)"}
+                                </Text>
+                            </div>
+                        )}
+
+                        <TouchableOpacity
+                            style={[styles.saveButton, isSavingPhoto && styles.buttonDisabled]}
+                            onPress={savePhoto}
+                            disabled={isSavingPhoto}
+                        >
+                            {isSavingPhoto ? (
+                                <ActivityIndicator color="#fff" />
+                            ) : (
+                                <Text style={styles.saveButtonText}>
+                                    {user.language === "English" ? "Save Photo" : "Enregistrer la photo"}
+                                </Text>
+                            )}
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.cancelButton} onPress={() => setPhotoModalVisible(false)}>
+                            <Text style={styles.cancelButtonText}>
+                                {user.language === "English" ? "Cancel" : "Annuler"}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+
 
 
         </View>
@@ -329,6 +537,76 @@ const CortexPrediction: React.FC = () => {
 export default CortexPrediction;
 
 const styles = StyleSheet.create({
+    pasteZone: {
+        width: "100%",
+        height: 100,
+        borderWidth: 1,
+        borderColor: "#ccc",
+        borderRadius: 8,
+        backgroundColor: "#f0f0f0",
+        padding: 8,
+        marginBottom: 16,
+        textAlignVertical: "top",
+        color: "#333",
+    },
+    modalText: {
+        fontSize: 16,
+        color: "#7f8c8d",
+        marginBottom: 16,
+    },
+    buttonDisabled: {
+        opacity: 0.5,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: "rgba(0, 0, 0, 0.6)",
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    modalContainer: {
+        width: "80%", // Réduit la largeur
+        padding: 16,
+        backgroundColor: "#ffffff",
+        borderRadius: 12,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 6,
+        elevation: 10,
+        alignItems: "center",
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: "bold",
+        marginBottom: 16,
+    },
+    imagePreview: {
+        width: 200,
+        height: 200,
+        borderRadius: 8,
+        marginBottom: 16,
+    },
+    cancelButton: {
+        marginTop: 8,
+        padding: 12,
+        borderRadius: 8,
+        backgroundColor: "#7f8c8d",
+    },
+    cancelButtonText: {
+        color: "#fff",
+        fontWeight: "bold",
+    },
+    photoButton: {
+        marginTop: 8,
+        backgroundColor: "#001933",
+        padding: 8,
+        borderRadius: 8,
+    },
+    photoButtonText: {
+        color: "#fff",
+        fontWeight: "bold",
+    },
+
     container: {
         flex: 1,
         padding: 16,

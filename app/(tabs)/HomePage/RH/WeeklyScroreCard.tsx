@@ -3,8 +3,8 @@ import { StyleSheet, Text, View, TouchableOpacity, Alert, ScrollView, ActivityIn
 import axios from 'axios';
 import * as DocumentPicker from 'expo-document-picker';
 import { useRoute } from '@react-navigation/native';
-const URL = 'https://coral-app-wqv9l.ondigitalocean.app'; // Ensure the correct URL
-const URL_warnings = 'https://coral-app-wqv9l.ondigitalocean.app'; // Ensure the correct URL
+import AppURL from '@/components/src/URL';
+
 
 type User = {
   _id: string;
@@ -43,7 +43,7 @@ const WeeklyScoreCard = () => {
       formData.append('file', file);
 
       try {
-        const response = await axios.post(`https://coral-app-wqv9l.ondigitalocean.app/api/ScroceCrd/upload?dsp_code=${user.dsp_code}`, formData, {
+        const response = await axios.post(`${AppURL}/api/ScroceCrd/upload?dsp_code=${user.dsp_code}`, formData, {
           headers: {
             'Content-Type': 'multipart/form-data',
           },
@@ -82,7 +82,7 @@ const WeeklyScoreCard = () => {
         return;
       }
 
-      const updateResponse = await axios.put(`${URL}/api/employee/scoreCard?dsp_code=${user.dsp_code}`, scorecardUpdates);
+      const updateResponse = await axios.put(`${AppURL}/api/employee/scoreCard?dsp_code=${user.dsp_code}`, scorecardUpdates);
       if (updateResponse.status === 200) {
         showAlert('Success', 'Profiles updated successfully');
       } else {
@@ -91,7 +91,7 @@ const WeeklyScoreCard = () => {
         return;
       }
 
-      const employeesResponse = await axios.get(`${URL}/api/employee?dsp_code=${user.dsp_code}`);
+      const employeesResponse = await axios.get(`${AppURL}/api/employee?dsp_code=${user.dsp_code}`);
       const employees = employeesResponse.data;
 
       const employeesByTransporterId = employees.reduce((acc: any, employee: any) => {
@@ -129,7 +129,7 @@ const WeeklyScoreCard = () => {
         return;
       }
 
-      const warningResponse = await axios.post(`${URL_warnings}/api/warnings/wornings/bulk?dsp_code=${user.dsp_code}`, warningsToCreate);
+      const warningResponse = await axios.post(`${AppURL}/api/warnings/wornings/bulk?dsp_code=${user.dsp_code}`, warningsToCreate);
       if (warningResponse.status === 200) {
         showAlert(
           user.language === 'English' ? 'Success' : 'Succès',

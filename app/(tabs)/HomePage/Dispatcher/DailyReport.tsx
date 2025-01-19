@@ -18,8 +18,7 @@ import { ScrollView } from 'react-native-gesture-handler';
 import { BarChart, PieChart, LineChart } from 'react-native-chart-kit';
 import { ResponsiveBar } from '@nivo/bar';
 import AppURL from '@/components/src/URL';
-AppURL
-
+import PickerModal from '@/components/src/PickerModal';
 const URL_employee = `${AppURL}/api/employee`;
 const URL_violation = `${AppURL}/api/dailyViolations`;
 
@@ -105,7 +104,7 @@ const DailyReport = () => {
 
       // Appel de l'API avec le paramètre `selectedDate`
       const response = await axios.get(`${URL_violation}/violations/by-day`, {
-        params: { selectedDate: formattedDate,dsp_code: user.dsp_code, },
+        params: { selectedDate: formattedDate, dsp_code: user.dsp_code, },
       });
 
       // Vérification et mise à jour de l'état avec les données reçues
@@ -131,17 +130,17 @@ const DailyReport = () => {
 
   const fetchEmployees = async () => {
     try {
-        const response = await axios.get(URL_employee, {
-            params: {
-                dsp_code: user.dsp_code, // Ajout du dsp_code
-            },
-        });
-        setEmployees(response.data);
+      const response = await axios.get(URL_employee, {
+        params: {
+          dsp_code: user.dsp_code, // Ajout du dsp_code
+        },
+      });
+      setEmployees(response.data);
     } catch (error) {
-        console.error('Error fetching employees:', error);
-        Alert.alert('Error', 'Failed to load employees.');
+      console.error('Error fetching employees:', error);
+      Alert.alert('Error', 'Failed to load employees.');
     }
-};
+  };
 
 
   useEffect(() => {
@@ -252,18 +251,18 @@ const DailyReport = () => {
     if (!selectedViolation) return;
 
     try {
-        await axios.delete(`${URL_violation}/${selectedViolation._id}`, {
-            params: {
-                dsp_code: user.dsp_code, // Ajout du dsp_code
-            },
-        });
-        setIsEditModalVisible(false);
-        fetchViolations(); // Recharger la liste des violations
+      await axios.delete(`${URL_violation}/${selectedViolation._id}`, {
+        params: {
+          dsp_code: user.dsp_code, // Ajout du dsp_code
+        },
+      });
+      setIsEditModalVisible(false);
+      fetchViolations(); // Recharger la liste des violations
     } catch (error) {
-        console.error('Error deleting violation:', error);
-        Alert.alert('Error', 'Failed to delete violation.');
+      console.error('Error deleting violation:', error);
+      Alert.alert('Error', 'Failed to delete violation.');
     }
-};
+  };
 
 
   const resetForm = () => {
@@ -430,38 +429,61 @@ const DailyReport = () => {
             />
 
             {/* Liste filtrée des employés */}
-            <Picker
+            <PickerModal
+              title={user.language === 'English' ? 'Select an employee' : 'Sélectionner un employé'}
               selectedValue={selectedEmployee}
+              options={filteredEmployees.map((employee) => ({
+                label: `${employee.name} ${employee.familyName}`,
+                value: employee._id,
+              }))}
               onValueChange={(itemValue) => setSelectedEmployee(itemValue)}
-              style={styles.picker}
-            >
-              <Picker.Item
-                label={user.language === 'English' ? 'Select an employee' : 'Sélectionner un employé'}
-                value=""
-              />
-              {filteredEmployees.map((employee: { _id: React.Key | null | undefined; name: any; familyName: any; }) => (
-                <Picker.Item
-                  key={employee._id}
-                  label={`${employee.name} ${employee.familyName}`}
-                  value={employee._id}
-                />
-              ))}
-            </Picker>
+              style={{
+                container: {
+                  height: 50,
+                  borderColor: '#001933',
+                  borderRadius: 8,
+                  backgroundColor: '#f9f9f9',
+                  justifyContent: 'center',
+                  marginBottom: 16,
+                },
+                input: {
+                  fontSize: 16,
+                  color: '#001933',
+                },
+                picker: {
+                  backgroundColor: '#ffffff',
+                },
+              }}
+            />
 
-            <Picker
+
+            <PickerModal
+              title={user.language === 'English' ? 'Select a violation type' : 'Sélectionner un type de violation'}
               selectedValue={selectedViolationType}
+              options={violationTypes.map((type) => ({
+                label: type,
+                value: type,
+              }))}
               onValueChange={(itemValue) => setSelectedViolationType(itemValue)}
-              style={styles.picker}
-            >
-              <Picker.Item
-                label={user.language === 'English' ? 'Select a violation type' : 'Sélectionner un type de violation'}
-                value=""
-              />
+              style={{
+                container: {
+                  height: 50,
+                  borderColor: '#001933',
+                  borderRadius: 8,
+                  backgroundColor: '#f9f9f9',
+                  justifyContent: 'center',
+                  marginBottom: 16,
+                },
+                input: {
+                  fontSize: 16,
+                  color: '#001933',
+                },
+                picker: {
+                  backgroundColor: '#ffffff',
+                },
+              }}
+            />
 
-              {violationTypes.map((type) => (
-                <Picker.Item key={type} label={type} value={type} />
-              ))}
-            </Picker>
 
             <TextInput
               style={styles.input}
@@ -501,19 +523,35 @@ const DailyReport = () => {
             <Text style={styles.modalTitle}>
               {user.language === 'English' ? 'Edit Violation' : 'Modifier une violation'}
             </Text>
-            <Picker
+            <PickerModal
+              title={user.language === 'English' ? 'Select a violation type' : 'Sélectionner un type de violation'}
               selectedValue={selectedViolationType}
+              options={[
+                { label: user.language === 'English' ? 'Select a violation type' : 'Sélectionner un type de violation', value: '' },
+                ...violationTypes.map((type) => ({
+                  label: type,
+                  value: type,
+                })),
+              ]}
               onValueChange={(itemValue) => setSelectedViolationType(itemValue)}
-              style={styles.picker}
-            >
-              <Picker.Item
-                label={user.language === 'English' ? 'Select a violation type' : 'Sélectionner un type de violation'}
-                value=""
-              />
-              {violationTypes.map((type) => (
-                <Picker.Item key={type} label={type} value={type} />
-              ))}
-            </Picker>
+              style={{
+                container: {
+                  height: 50,
+                  borderColor: '#001933',
+                  borderRadius: 8,
+                  backgroundColor: '#f9f9f9',
+                  justifyContent: 'center',
+                  marginBottom: 16,
+                },
+                input: {
+                  fontSize: 16,
+                  color: '#001933',
+                },
+                picker: {
+                  backgroundColor: '#ffffff',
+                },
+              }}
+            />
             <TextInput
               style={styles.input}
               placeholder={user.language === 'English' ? 'Violation Link' : 'Lien de la violation'}

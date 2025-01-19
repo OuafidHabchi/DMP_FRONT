@@ -13,14 +13,12 @@ import { RootStackParamList } from './_layout';
 import { useNavigation } from '@react-navigation/native';
 import axios from 'axios';
 import * as Notifications from 'expo-notifications';
-
-const URL = 'https://coral-app-wqv9l.ondigitalocean.app';
+import AppURL from '@/components/src/URL';
 
 type Sign_UpScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Sign_Up'>;
 
 const Sign_Up: React.FC = () => {
   const navigation = useNavigation<Sign_UpScreenNavigationProp>();
-
   const [inputstate, setinputstate] = useState({
     name: '',
     familyName: '',
@@ -149,7 +147,7 @@ const Sign_Up: React.FC = () => {
     console.log('New User Data:', nouvelUtilisateur);
 
     try {
-      const response = await axios.post(`${URL}/api/employee/register`, nouvelUtilisateur);
+      const response = await axios.post(`${AppURL}/api/employee/register`, nouvelUtilisateur);
       console.log('Server Response:', response.data);
       setSuccessMessage('Account created successfully.');
       Alert.alert('Your account has been created.');

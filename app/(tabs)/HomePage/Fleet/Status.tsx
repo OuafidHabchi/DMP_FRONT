@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, FlatList, TouchableOpacity, Modal, TextInput, Button, Alert, RefreshControl, Platform, ToastAndroid, ScrollView } from 'react-native';
 import axios from 'axios';
 import { useRoute } from '@react-navigation/native';
+import AppURL from '@/components/src/URL';
 
 type StatusType = {
     _id: string;
@@ -32,13 +33,10 @@ const StatusScreen = () => {
     const [isAddModalVisible, setIsAddModalVisible] = useState(false);
     const [newStatus, setNewStatus] = useState({ name: '', location: '', color: '' });
     const [refreshing, setRefreshing] = useState(false);
-
-    const API_URL = 'https://coral-app-wqv9l.ondigitalocean.app';
-
     // Fetch statuses from the backend
     const fetchStatuses = async () => {
         try {
-            const response = await axios.get(`${API_URL}/api/statuses/all?dsp_code=${user.dsp_code}`);
+            const response = await axios.get(`${AppURL}/api/statuses/all?dsp_code=${user.dsp_code}`);
             setStatuses(response.data);
         } catch (error) {
             showMessage('Failed to fetch statuses', 'error');
@@ -64,7 +62,7 @@ const StatusScreen = () => {
     // Add a new status
     const createStatus = async () => {
         try {
-            const response = await axios.post(`${API_URL}/api/statuses/create?dsp_code=${user.dsp_code}`, newStatus);
+            const response = await axios.post(`${AppURL}/api/statuses/create?dsp_code=${user.dsp_code}`, newStatus);
             setStatuses([...statuses, response.data]);
             setIsAddModalVisible(false); // Close modal after creation
             setNewStatus({ name: '', location: '', color: '' }); // Reset form
@@ -84,7 +82,7 @@ const StatusScreen = () => {
     const updateStatus = async () => {
         if (selectedStatus) {
             try {
-                const response = await axios.put(`${API_URL}/api/statuses/${selectedStatus._id}?dsp_code=${user.dsp_code}`, selectedStatus);
+                const response = await axios.put(`${AppURL}/api/statuses/${selectedStatus._id}?dsp_code=${user.dsp_code}`, selectedStatus);
                 setStatuses(
                     statuses.map(status => (status._id === selectedStatus._id ? response.data : status))
                 );
@@ -106,7 +104,7 @@ const StatusScreen = () => {
     // Delete a status
     const deleteStatus = async (id: string) => {
         try {
-            await axios.delete(`${API_URL}/api/statuses/${id}?dsp_code=${user.dsp_code}`);
+            await axios.delete(`${AppURL}/api/statuses/${id}?dsp_code=${user.dsp_code}`);
             setStatuses(statuses.filter(status => status._id !== id));
             setIsModalVisible(false); // Close modal after deletion
             showMessage(

@@ -11,12 +11,14 @@ import {
   RefreshControl,
   ActivityIndicator,
   ScrollView,
+  Linking,
 } from 'react-native';
 import { useRoute } from '@react-navigation/native';
 import axios from 'axios';
 import { Image } from 'react-native'; // Pour afficher l'aperçu de l'image
 import ImageViewer from 'react-native-image-zoom-viewer';
 import AppURL from '@/components/src/URL';
+import FontAwesome from 'react-native-vector-icons/FontAwesome';
 
 type User = {
   _id: string;
@@ -40,11 +42,11 @@ type Warning = {
   date: string;
   severity: 'low' | 'medium' | 'high'; // Ajout de la sévérité
   type: 'warning' | 'suspension';
-  startDate?: string;
-  endDate?: string;
   read: boolean;
   signature: boolean;
   photo: '';
+  link?: string;
+  susNombre?: string;
 };
 
 const EmployeeWarnings = () => {
@@ -57,6 +59,7 @@ const EmployeeWarnings = () => {
   const [blinkAnim] = useState(new Animated.Value(1));
   const [loading, setLoading] = useState(false);
   const [pulseAnim] = useState(new Animated.Value(1)); // Valeur d'animation pour l'effet "pulse"
+
 
   useEffect(() => {
     // Animation infinie de pulse
@@ -89,18 +92,16 @@ const EmployeeWarnings = () => {
   const fetchWarnings = async () => {
     try {
       const response = await axios.get(`${AppURL}/api/warnings/wornings/employe/${user._id}?dsp_code=${user.dsp_code}`);
-      const sortedWarnings = response.data.sort(
-        (a: Warning, b: Warning) => new Date(b.date).getTime() - new Date(a.date).getTime()
-      );
-      setWarnings(sortedWarnings);
+      setWarnings(response.data.reverse()); // Inverser pour afficher le dernier en haut
     } catch (error) {
       console.error('Failed to fetch warnings:', error);
     }
   };
+
+
   const fetchWarningDetails = async (warningId: string) => {
     try {
       setLoading(true); // Commence le chargement
-      await new Promise((resolve) => setTimeout(resolve, 2000)); // Délai artificiel (2 secondes)
       const response = await axios.get(`${AppURL}/api/warnings/wornings/${warningId}?dsp_code=${user.dsp_code}`);
       const warningData = response.data;
 
@@ -267,14 +268,12 @@ const EmployeeWarnings = () => {
                 {selectedWarning?.type === 'suspension' && (
                   <>
                     <Text style={styles.modalText}>
-                      {user.language === 'English' ? 'Start Date: ' : 'Date de début: '}
-                      {selectedWarning.startDate || 'N/A'}
+                      {user.language === 'English'
+                        ? 'Number of Suspended Shifts: '
+                        : 'Nombre de shifts suspendus: '}
+                      {selectedWarning.susNombre}
                     </Text>
 
-                    <Text style={styles.modalText}>
-                      {user.language === 'English' ? 'End Date: ' : 'Date de fin: '}
-                      {selectedWarning.endDate || 'N/A'}
-                    </Text>
                   </>
                 )}
 
@@ -291,6 +290,18 @@ const EmployeeWarnings = () => {
                   </View>
                 )}
 
+                {selectedWarning?.link && selectedWarning.link !== '' && (
+                  <TouchableOpacity
+                    onPress={() => Linking.openURL(selectedWarning.link!)}
+                    style={styles.linkButton}
+                  >
+                    <Text style={styles.modalLink}>
+                      {user.language === 'English' ? 'For more details, click here' : 'Pour plus de détails, cliquez ici'}
+                    </Text>
+
+                    <FontAwesome name="external-link" size={16} color="#001933" />
+                  </TouchableOpacity>
+                )}
                 {/* Signature Button for Warnings */}
                 {selectedWarning?.type === 'warning' && !selectedWarning?.signature && (
                   <View style={styles.buttonGroup}>
@@ -355,7 +366,7 @@ const EmployeeWarnings = () => {
           <Text style={styles.emptyText}>
             {user.language === 'English' ? 'No warnings available.' : 'Aucun avertissement disponible.'}
           </Text>
-        }        
+        }
       />
       {renderWarningDetails()}
       {selectedWarning?.photo && (
@@ -544,10 +555,25 @@ const styles = StyleSheet.create({
   modalText: {
     padding: 10,
     fontSize: 14,
-    color: '#555',
+    color: '#ff4d4d',
     marginTop: 5,
     fontWeight: 'bold',
 
+  },
+  linkButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f0f8ff',
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 15,
+  },
+  modalLink: {
+    fontSize: 16,
+    color: '#001933',
+    marginRight: 8,
+    fontWeight: 'bold',
   },
   buttonGroup: {
     flexDirection: 'row',

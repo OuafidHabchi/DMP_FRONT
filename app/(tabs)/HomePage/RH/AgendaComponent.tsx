@@ -3,9 +3,7 @@ import { StyleSheet, Text, View, TouchableOpacity, Modal, TextInput, Pressable, 
 import axios from 'axios';
 import { useRoute } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
-
-
-const URL = 'https://coral-app-wqv9l.ondigitalocean.app/api/events';
+import AppURL from '@/components/src/URL';
 
 type Event = {
   _id: string;
@@ -63,7 +61,7 @@ const Agenda = () => {
 
   const fetchEvents = async () => {
     try {
-      const response = await axios.get(`${URL}?dsp_code=${user.dsp_code}`, { params: { month: currentMonth + 1, year: currentYear } });
+      const response = await axios.get(`${AppURL}/api/events?dsp_code=${user.dsp_code}`, { params: { month: currentMonth + 1, year: currentYear } });
       setEvents(response.data);
     } catch (error) {
       Alert.alert('Erreur', 'Impossible de récupérer les événements');
@@ -97,7 +95,7 @@ const Agenda = () => {
 
   const fetchEmployees = async () => {
     try {
-      const response = await axios.get(`https://coral-app-wqv9l.ondigitalocean.app/api/employee?dsp_code=${user.dsp_code}`);
+      const response = await axios.get(`${AppURL}/api/employee?dsp_code=${user.dsp_code}`);
       const nonDriverEmployees = response.data.filter((employee: Employee) => employee.role !== 'driver');
       setEmployees(nonDriverEmployees);
       setFilteredEmployees(nonDriverEmployees);
@@ -220,7 +218,7 @@ const Agenda = () => {
 
       if (currentEvent) {
         if (user._id === currentEvent.createdBy) {
-          await axios.put(`${URL}/${currentEvent._id}?dsp_code=${user.dsp_code}`, eventData);
+          await axios.put(`${AppURL}/api/events/${currentEvent._id}?dsp_code=${user.dsp_code}`, eventData);
           Alert.alert(
             user.language === 'English' ? 'Success' : 'Succès',
             user.language === 'English' ? 'Event updated' : 'Événement mis à jour'
@@ -239,7 +237,7 @@ const Agenda = () => {
           return;
         }
       } else {
-        await axios.post(`${URL}`, eventData);
+        await axios.post(`${AppURL}/api/events/`, eventData);
         Alert.alert(
           user.language === 'English' ? 'Success' : 'Succès',
           user.language === 'English' ? 'Event created' : 'Événement créé'
@@ -264,7 +262,7 @@ const Agenda = () => {
   const handleDeleteEvent = async () => {
     if (currentEvent && user._id === currentEvent.createdBy) {
       try {
-        await axios.delete(`${URL}/${currentEvent._id}?dsp_code=${user.dsp_code}`);
+        await axios.delete(`${AppURL}/api/events/${currentEvent._id}?dsp_code=${user.dsp_code}`);
         Alert.alert('Succès', 'Événement supprimé');
         fetchEvents();
         setEventModalVisible(false);

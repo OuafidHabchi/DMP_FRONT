@@ -8,7 +8,8 @@ import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { useRoute } from '@react-navigation/native';
 import AppURL from '@/components/src/URL';
-AppURL
+import PickerModal from '@/components/src/PickerModal';
+
 
 
 const URL_TimeCard = `${AppURL}/api/timecards`;
@@ -131,6 +132,8 @@ const TimeCard: React.FC = () => {
   const [manualLastDeliveryTimes, setManualLastDeliveryTimes] = useState<Record<string, string>>({});
   const [isSavingAll, setIsSavingAll] = useState(false);
   const [refreshing, setRefreshing] = useState(false); // État pour gérer le pull-to-refresh
+  const [loadingSave, setLoadingSave] = useState<Record<string, boolean>>({});
+
 
 
   useEffect(() => {
@@ -138,7 +141,7 @@ const TimeCard: React.FC = () => {
       initializeTelAndPowerBankValues(timeCards);
     }
   }, [timeCards, functionalPhones, functionalPowerBanks]);
-  
+
 
   const onRefresh = async () => {
     setRefreshing(true); // Active l'indicateur
@@ -150,7 +153,7 @@ const TimeCard: React.FC = () => {
       setRefreshing(false); // Désactive l'indicateur
     }
   };
-  
+
 
 
   const generateAndDownloadPDF = async () => {
@@ -238,59 +241,47 @@ const TimeCard: React.FC = () => {
   };
 
   // Fonction pour sauvegarder le commentaire
-  // Fonction pour sauvegarder le commentaire
   const saveComment = async () => {
     if (currentCommentEmployeeId) {
-      const currentDay = formatDate(date); // Date actuelle
+      const currentDay = formatDate(date);
       const key = `${currentCommentEmployeeId}_${currentDay}`;
-      const existingComment = comments[key]; // Vérifier si un commentaire existe déjà
-
+      const existingComment = comments[key];
+  
       try {
         const data = {
           idEmploye: currentCommentEmployeeId,
           date: currentDay,
           comment: currentCommentText,
         };
-
+  
+        let updatedComments = { ...comments };
         let response;
-
+  
         if (existingComment) {
-          // Si un commentaire existe, on le met à jour
+          // Mise à jour du commentaire existant
           response = await axios.put(`${URL_Comment}/comments/${existingComment._id}?dsp_code=${user.dsp_code}`, data);
-
-          // Mettre à jour localement après succès
-          setComments((prev) => ({
-            ...prev,
-            [key]: {
-              _id: existingComment._id, // Conserver l'ID existant
-              text: currentCommentText, // Mettre à jour le texte
-            },
-          }));
+          updatedComments[key] = { _id: existingComment._id, text: currentCommentText };
         } else {
-          // Si aucun commentaire n'existe, on le crée
+          // Création d'un nouveau commentaire
           response = await axios.post(`${URL_Comment}/comments/create?dsp_code=${user.dsp_code}`, data);
-
-          const createdComment = response.data; // Suppose que l'API retourne le commentaire créé avec `_id` et `text`
-
-          // Ajouter le nouveau commentaire localement après succès
-          setComments((prev) => ({
-            ...prev,
-            [key]: {
-              _id: createdComment._id,
-              text: createdComment.comment,
-            },
-          }));
-
+          updatedComments[key] = { _id: response.data._id, text: response.data.comment };
         }
-        // Rafraîchir la liste des commentaires
-        await fetchCommentsByDate();
+  
+        // Mettre à jour l'état local avec les nouveaux commentaires
+        setComments(updatedComments);
+  
+        // Fermer le modal après la mise à jour du commentaire
+        setIsCommentModalVisible(false);
+  
       } catch (error) {
-        Alert.alert('Erreur', "Impossible de sauvegarder le commentaire.");
+        Alert.alert('Error', 'Failed to save the comment.');
       }
-
-      setIsCommentModalVisible(false); // Fermer le modal
     }
   };
+  
+  
+  
+
 
   const deleteComment = async (commentId: string) => {
     try {
@@ -361,9 +352,6 @@ const TimeCard: React.FC = () => {
     setPowerBankValues(initialPowerBankValues);
   };
 
-
-
-
   const fetchData = async () => {
     // Réinitialiser les états
     setTimeCards([]);
@@ -372,149 +360,125 @@ const TimeCard: React.FC = () => {
     setVans({});
     setVanAssignments([]);
     setDisponibilities({});
+    setComments({});
     setLoading(true);
 
     const formattedDate = formatDate(date);
 
     try {
-      // 1. Récupérer les `VanAssignments` pour le jour donné
-      const vanAssignmentRes = await axios.get<VanAssignment[]>(`${AppURL}/api/vanAssignments/date/${encodeURIComponent(formattedDate)}?dsp_code=${user.dsp_code}`);
-      const vanAssignments = vanAssignmentRes.data;
+      // Étape 1 : Récupérer les données de base en parallèle
+      const [vanAssignmentsRes, commentsRes, dispoRes, timeCardRes] = await Promise.all([
+        axios
+          .get<VanAssignment[]>(
+            `${AppURL}/api/vanAssignments/date/${encodeURIComponent(formattedDate)}?dsp_code=${user.dsp_code}`
+          )
+          .catch(() => ({ data: [] })), // Retourne un tableau vide en cas d'erreur
+        axios
+          .get(`${URL_Comment}/comments/date/${encodeURIComponent(formattedDate)}?dsp_code=${user.dsp_code}`)
+          .catch(() => ({ data: [] })), // Retourne un tableau vide en cas d'erreur
+        axios
+          .get<Disponibility[]>(
+            `${AppURL}/api/disponibilites/presence/confirmed-by-day`,
+            { params: { selectedDay: formattedDate, dsp_code: user.dsp_code } }
+          )
+          .catch(() => ({ data: [] })), // Retourne un tableau vide en cas d'erreur
+        axios
+          .get<TimeCardData[]>(
+            `${URL_TimeCard}/timecardsss/dday/${encodeURIComponent(formattedDate)}`,
+            { params: { dsp_code: user.dsp_code } }
+          )
+          .catch(() => ({ data: [] })), // Retourne un tableau vide en cas d'erreur
+      ]);
+
+      // Étape 2 : Traiter les données récupérées
+      const vanAssignments = vanAssignmentsRes.data || [];
       setVanAssignments(vanAssignments);
 
-      // 2. Extraire les IDs des employés et vans des `VanAssignments`
-      const employeeIds = [...new Set(vanAssignments.map(assignment => assignment.employeeId))];
-      const vanIds = [...new Set(vanAssignments.map(assignment => assignment.vanId))];
+      const commentsData = commentsRes.data || [];
+      const commentsMap = commentsData.reduce((acc: Record<string, Comment>, comment: any) => {
+        acc[`${comment.idEmploye}_${comment.date}`] = { _id: comment._id, text: comment.comment };
+        return acc;
+      }, {});
+      setComments(commentsMap);
 
-      // 3. Récupérer les informations des employés par leurs IDs
-      const employeeRes = await axios.post<Employee[]>(
-        `${AppURL}/api/employee/by-ids`,
-        { ids: employeeIds }, // Keep the payload as it is
-        {
-          params: { dsp_code: user.dsp_code }, // Add dsp_code as a query parameter
-        }
-      );
-            const employeeMap = employeeRes.data.reduce((map, employee) => {
+      const dispoMap = dispoRes.data.reduce((map, dispo) => {
+        map[dispo.employeeId] = dispo;
+        return map;
+      }, {} as Record<string, Disponibility>);
+      setDisponibilities(dispoMap);
+
+      const timeCards = timeCardRes.data || [];
+      const initialLastDeliveryTimes: Record<string, string> = {};
+      timeCards.forEach((tc) => {
+        initialLastDeliveryTimes[tc.employeeId] = tc.lastDelivery || '';
+      });
+      setManualLastDeliveryTimes(initialLastDeliveryTimes);
+      setTimeCards(timeCards);
+      initializeTelAndPowerBankValues(timeCards);
+
+      // Extraction des IDs nécessaires
+      const employeeIds = [...new Set(vanAssignments.map((assignment) => assignment.employeeId))];
+      const vanIds = [...new Set(vanAssignments.map((assignment) => assignment.vanId))];
+      const shiftIds = [...new Set(Object.values(dispoMap).map((dispo) => dispo.shiftId))];
+
+      // Étape 3 : Récupérer les données dépendantes en parallèle
+      const [employeeRes, shiftMap, vanMap] = await Promise.all([
+        // Récupérer les employés
+        axios
+          .post<Employee[]>(`${AppURL}/api/employee/by-ids`, { ids: employeeIds }, { params: { dsp_code: user.dsp_code } })
+          .catch(() => ({ data: [] })), // Retourne un tableau vide en cas d'erreur
+
+        // Récupérer les informations des shifts
+        (async () => {
+          const shifts: Record<string, Shift> = {};
+          await Promise.all(
+            shiftIds.map(async (shiftId) => {
+              try {
+                const shiftRes = await axios.get<Shift>(`${AppURL}/api/shifts/shifts/${shiftId}?dsp_code=${user.dsp_code}`);
+                shifts[shiftRes.data._id] = shiftRes.data;
+              } catch {
+                // Ignorer les erreurs
+              }
+            })
+          );
+          return shifts;
+        })(),
+
+        // Récupérer les informations des véhicules
+        (async () => {
+          const vans: Record<string, Vehicle> = {};
+          await Promise.all(
+            vanIds.map(async (vanId) => {
+              try {
+                const vehicleRes = await axios.get<Vehicle>(`${AppURL}/api/vehicles/${vanId}?dsp_code=${user.dsp_code}`);
+                if (vehicleRes.data && vehicleRes.data.data) {
+                  vans[vehicleRes.data.data._id] = vehicleRes.data.data;
+                }
+              } catch {
+                // Ignorer les erreurs
+              }
+            })
+          );
+          return vans;
+        })(),
+      ]);
+
+      // Traiter les employés
+      const employeeMap = (employeeRes.data || []).reduce((map, employee) => {
         map[employee._id] = employee;
         return map;
       }, {} as Record<string, Employee>);
       setEmployees(employeeMap);
 
-      // 4. Récupérer la `Disponibility` pour chaque employé et le jour donné
-      const dispoMap: Record<string, Disponibility> = {};
-      for (const employeeId of employeeIds) {
-        try {
-          const dispoRes = await axios.get<Disponibility[]>(`${AppURL}/api/disponibilites/disponibilites/employee/${employeeId}/day/${encodeURIComponent(formattedDate)}?dsp_code=${user.dsp_code}`);
-          dispoRes.data.forEach((dispo: Disponibility) => {
-            dispoMap[dispo.employeeId] = dispo;
-          });
-        } catch (error) {
-          console.error(`Erreur lors de la récupération de la disponibilité pour l'employé ${employeeId}:`, error);
-        }
-      }
-      setDisponibilities(dispoMap);
-
-      // 5. Récupérer les informations de `Shift` à partir des IDs de `Shift` présents dans les disponibilités
-      const shiftIds = [...new Set(Object.values(dispoMap).map(dispo => dispo.shiftId))];
-      const shiftMap: Record<string, Shift> = {};
-      for (const shiftId of shiftIds) {
-        try {
-          const shiftRes = await axios.get<Shift>(`${AppURL}/api/shifts/shifts/${shiftId}?dsp_code=${user.dsp_code}`);
-          shiftMap[shiftRes.data._id] = shiftRes.data;
-        } catch (error) {
-          console.error(`Erreur lors de la récupération du shift avec l'ID ${shiftId}:`, error);
-        }
-      }
+      // Traiter les shifts et les véhicules
       setShifts(shiftMap);
-
-      // 6. Récupérer les informations des véhicules à partir des IDs de vans
-      const vanMap: Record<string, Vehicle> = {};
-      for (const vanId of vanIds) {
-        if (vanId) {
-          try {
-            const vehicleRes = await axios.get<Vehicle>(`${AppURL}/api/vehicles/${vanId}?dsp_code=${user.dsp_code}`);
-            if (vehicleRes.data && vehicleRes.data.data) {
-              vanMap[vehicleRes.data.data._id] = vehicleRes.data.data;
-            }
-          } catch (error) {
-            console.error(`Erreur lors de la récupération des détails du véhicule pour le vanID ${vanId}:`, error);
-          }
-        }
-      }
       setVans(vanMap);
-
-      // 7. Récupérer et organiser les `TimeCards` par jour, puis les aplatir      
-      try {
-        const timeCardRes = await axios.get<TimeCardData[]>(`${URL_TimeCard}/timecardsss/dday/${encodeURIComponent(formattedDate)}`, {
-          params: {
-            dsp_code: user.dsp_code,
-          },
-        });
-        
-        // Grouper les timeCards par jour
-        const groupedByDay = timeCardRes.data.reduce((acc, timeCard) => {
-          const day = timeCard.day;
-          if (!acc[day]) acc[day] = [];
-          acc[day].push(timeCard);
-          return acc;
-        }, {} as Record<string, TimeCardData[]>);
-
-        const initialLastDeliveryTimes: Record<string, string> = {};
-        timeCardRes.data.forEach(tc => {
-          initialLastDeliveryTimes[tc.employeeId] = tc.lastDelivery || '';
-        });
-        setManualLastDeliveryTimes(initialLastDeliveryTimes);
-
-        // Aplatir les données groupées pour obtenir un tableau unique
-        const flattenedTimeCards = Object.values(groupedByDay).flat();
-        setTimeCards(flattenedTimeCards);
-        initializeTelAndPowerBankValues(flattenedTimeCards);
-
-      } catch (error) {
-        if (axios.isAxiosError(error) && error.response?.status === 404) {
-          console.log("Aucune time card trouvée pour cette journée.");
-        } else {
-          console.error("Erreur lors de la récupération des time cards:", error);
-          Alert.alert("Erreur", "Échec de la récupération des time cards pour le jour sélectionné.");
-        }
-      }
-
-    } catch (error) {
-      // console.error("Erreur générale lors de la récupération des données:", error);
-      // Alert.alert("Erreur", "Échec de la récupération des données pour le jour sélectionné.");
+    } catch {
+      // Ignorer les erreurs générales
     } finally {
       setLoading(false);
     }
   };
-
-  // Fonction pour récupérer les commentaires par employé et date
-  const fetchCommentsByDate = async () => {
-    try {
-      const formattedDate = formatDate(date); // Date actuelle formatée
-      const response = await axios.get(`${URL_Comment}/comments/date/${encodeURIComponent(formattedDate)}?dsp_code=${user.dsp_code}`);
-      const commentsData = response.data;
-
-      // Convertir les commentaires en un objet clé-valeur pour un accès rapide
-      const commentsMap = commentsData.reduce((acc: Record<string, Comment>, comment: any) => {
-        acc[`${comment.idEmploye}_${comment.date}`] = { _id: comment._id, text: comment.comment };
-        return acc;
-      }, {});
-
-      setComments(commentsMap); // Mettre à jour l'état local des commentaires
-    } catch (error) {
-      // Si l'erreur est 404, ne pas afficher le message dans la console
-      if (axios.isAxiosError(error) && error.response?.status === 404) {
-        // Pas de commentaires pour cette date : pas d'action nécessaire
-        setComments({}); // Réinitialiser les commentaires à un objet vide
-      } else {
-        // Gérer les autres erreurs
-      }
-    }
-  };
-
-
-
-
 
   useEffect(() => {
     // Réinitialise les valeurs à chaque changement de date
@@ -529,7 +493,6 @@ const TimeCard: React.FC = () => {
     setTelValues({});
     setPowerBankValues({});
     fetchFunctionalDevices();
-    fetchCommentsByDate(); // Charger les commentaires pour la date actuelle
     fetchData();
   }, [date]); // Utilise `date` comme dépendance pour mettre à jour à chaque changement de jour
 
@@ -592,44 +555,43 @@ const TimeCard: React.FC = () => {
 
   const handleUpdate = async (employeeId: string, day: string) => {
     if (!day) {
-      day = formatDate(new Date()); // Use the current date if day is not provided
+      day = formatDate(new Date());
     }
-  
+
+    setLoadingSave((prev) => ({ ...prev, [employeeId]: true })); // Activer le chargement pour cet employé
+
     const existingTimeCard = timeCards.find(tc => tc.employeeId === employeeId && tc.day === day) || {} as TimeCardData;
-  
     const updatedData: Partial<TimeCardData> = {};
-  
-    // Utilitaire pour comparer et mettre à jour
+
     const updateField = (field: keyof TimeCardData, newValue: any, existingValue: any) => {
       if (newValue !== existingValue) {
         updatedData[field] = newValue || existingValue;
       }
     };
-  
-    // Vérifications des champs modifiés
+
     updateField("tel", telValues[employeeId], existingTimeCard.tel);
     updateField("powerbank", powerBankValues[employeeId], existingTimeCard.powerbank);
     updateField("startTime", manualStartTimes[employeeId], existingTimeCard.startTime);
     updateField("endTime", manualEndTimes[employeeId], existingTimeCard.endTime);
     updateField("lastDelivery", manualLastDeliveryTimes[employeeId], existingTimeCard.lastDelivery);
-  
+
     if (Object.keys(updatedData).length === 0) {
       console.log("No modifications detected for this employee.");
+      setLoadingSave((prev) => ({ ...prev, [employeeId]: false })); // Désactiver le chargement
       return;
     }
-  
+
     const data = {
       employeeId,
       day,
       ...updatedData,
     };
-  
+
     try {
       await axios.put(`${URL_TimeCard}/timecards/${employeeId}/${encodeURIComponent(day)}?dsp_code=${user.dsp_code}`, data);
       Alert.alert("Success", "Time card updated successfully.");
     } catch (error) {
       if (axios.isAxiosError(error) && error.response?.status === 404) {
-        console.info("Time card not found. Creating a new record...");
         try {
           await axios.post(`${URL_TimeCard}/timecards?dsp_code=${user.dsp_code}`, data);
           Alert.alert("Success", "Time card created successfully.");
@@ -641,9 +603,12 @@ const TimeCard: React.FC = () => {
         console.error("Error updating time card:", error);
         Alert.alert("Error", "Failed to update the time card.");
       }
+    } finally {
+      setLoadingSave((prev) => ({ ...prev, [employeeId]: false })); // Désactiver le chargement
     }
   };
-  
+
+
 
 
 
@@ -742,7 +707,10 @@ const TimeCard: React.FC = () => {
         {/* Afficher Nom et Prénom de l'employé */}
 
         <Text
-          style={styles.cell}
+          style={[
+            styles.cell,
+            { flexWrap: Platform.OS === 'web' ? 'nowrap' : 'wrap', textAlign: 'left', width: '100%' }, // Wrap uniquement sur mobile
+          ]}
           onPress={() => openCommentModal(employeeId)}
         >
           {employee ? `${employee.name} ${employee.familyName}` : 'N/A'}
@@ -750,53 +718,89 @@ const TimeCard: React.FC = () => {
         </Text>
 
 
+
         {/* Afficher le Van assigné */}
         <Text style={styles.cell}>{van ? `${van.vehicleNumber}` : 'None'}</Text>
 
         {/* Champ TEL avec valeur filtrée */}
-        <View style={styles.inputContainerT_Pb}>
-          <Picker
-            selectedValue={telValues[employeeId] || ''}
-            onValueChange={(value) => handleTelChange(employeeId, value)}
-            style={styles.picker}
-          >
-            <Picker.Item label="NAN" value="" />
-            {getAvailablePhones(employeeId).map((phone) => (
-              <Picker.Item
-                key={phone._id}
-                label={
-                  telValues[employeeId] === phone._id
-                    ? (Platform.OS !== 'web' ? `🔴 ${phone.name}` : phone.name) // Cercle rouge uniquement si non web
+        <PickerModal
+          title="Select Phone"
+          selectedValue={telValues[employeeId] || ''}
+          options={[
+            { label: 'NAN', value: '' }, // Option par défaut
+            ...getAvailablePhones(employeeId).map((phone) => ({
+              label:
+                telValues[employeeId] === phone._id
+                  ? Platform.OS !== 'web'
+                    ? `${phone.name}` // Cercle rouge pour non web
                     : phone.name
-                }
-                value={phone._id}
-              />
-            ))}
-          </Picker>
-        </View>
+                  : phone.name,
+              value: phone._id,
+            })),
+          ]}
+          onValueChange={(value) => handleTelChange(employeeId, value)}
+          style={{
+            container: {
+              height: 30,
+              width: Platform.OS === 'web' ? 250 : 100,
+              borderColor: '#001933',
+              borderRadius: 8,
+              backgroundColor: '#f9f9f9',
+              justifyContent: 'center',
+              // marginRight: 0, // Ajout d'une marge à droite
+              marginHorizontal: 6, // Increase this to add space between input fields
+
+            },
+            input: {
+              height: 30,
+              fontSize: 16,
+              color: '#001933',
+            },
+            picker: {
+              backgroundColor: '#ffffff',
+            },
+          }}
+        />
+
 
         {/* Champ PowerBank avec valeur filtrée */}
-        <View style={styles.inputContainerT_Pb}>
-          <Picker
-            selectedValue={powerBankValues[employeeId] || ''}
-            onValueChange={(value) => handlePowerBankChange(employeeId, value)}
-            style={styles.picker}
-          >
-            <Picker.Item label="NAN" value="" />
-            {getAvailablePowerBanks(employeeId).map((powerBank) => (
-              <Picker.Item
-                key={powerBank._id}
-                label={
-                  powerBankValues[employeeId] === powerBank._id
-                    ? (Platform.OS !== 'web' ? `🔴 ${powerBank.name}` : powerBank.name) // Cercle rouge uniquement si non web
-                    : powerBank.name
-                }
-                value={powerBank._id}
-              />
-            ))}
-          </Picker>
-        </View>
 
+        <PickerModal
+          title="Select PowerBank"
+          selectedValue={powerBankValues[employeeId] || ''}
+          options={[
+            { label: 'NAN', value: '' }, // Option par défaut
+            ...getAvailablePowerBanks(employeeId).map((powerBank) => ({
+              label:
+                powerBankValues[employeeId] === powerBank._id
+                  ? Platform.OS !== 'web'
+                    ? `${powerBank.name}` // Cercle rouge pour non-web
+                    : powerBank.name
+                  : powerBank.name,
+              value: powerBank._id,
+            })),
+          ]}
+          onValueChange={(value) => handlePowerBankChange(employeeId, value)}
+          style={{
+            container: {
+              height: 30,
+              width: Platform.OS === 'web' ? 250 : 100,
+              borderColor: '#001933',
+              borderRadius: 8,
+              backgroundColor: '#f9f9f9',
+              justifyContent: 'center',
+              marginHorizontal: 6, // Increase this to add space between input fields
+            },
+            input: {
+              fontSize: 16,
+              height: 30,
+              color: '#001933',
+            },
+            picker: {
+              backgroundColor: '#ffffff',
+            },
+          }}
+        />
 
 
         {/* Champ Heure de Début éditable avec alerte si différent */}
@@ -844,11 +848,20 @@ const TimeCard: React.FC = () => {
         </View>
 
         {/* Bouton de Mise à Jour */}
-        <TouchableOpacity style={styles.updateButton} onPress={() => handleUpdate(employeeId, day)}>
-          <Text style={styles.updateButtonText}>
-            {user.language === 'English' ? 'Save' : 'Enregistrer'}
-          </Text>
+        <TouchableOpacity
+          style={styles.updateButton}
+          onPress={() => handleUpdate(employeeId, day)}
+          disabled={loadingSave[employeeId]} // Désactiver le bouton en cours de chargement
+        >
+          {loadingSave[employeeId] ? ( // Afficher le spinner si en cours de chargement
+            <ActivityIndicator size="small" color="#ffffff" />
+          ) : (
+            <Text style={styles.updateButtonText}>
+              {user.language === 'English' ? 'Save' : 'Enregistrer'}
+            </Text>
+          )}
         </TouchableOpacity>
+
       </View>
     );
   };
@@ -1176,17 +1189,16 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   cell: {
-    textAlign: 'auto', // Center-align text in data cells for consistency with header
+    textAlign: 'left', // Center-align text in data cells for consistency with header
     fontSize: 16,
     paddingVertical: 10,
     paddingHorizontal: 8,
     flex: 1,
-    minWidth: 100,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderColor: '#ccc',
+    borderColor: '#001933',
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 4,
@@ -1201,7 +1213,7 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
     paddingHorizontal: 5,
     fontSize: 14,
-    color: '#333',
+    color: '#001933',
     textAlign: 'center',
   },
   warningInputContainer: {
@@ -1252,20 +1264,6 @@ const styles = StyleSheet.create({
   warningText: {
     color: 'red',
     fontWeight: 'bold',
-  },
-  inputContainerT_Pb: {
-    justifyContent: 'center', // Centre le texte verticalement
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderColor: '#ccc',
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 4,
-    backgroundColor: '#f4f4f4',
-    flex: 1,
-    minWidth: 100,
-    height: 30,
-    marginHorizontal: 10, // Increase this to add space between input fields
   },
   picker: {
     height: 30, // Garder une hauteur raisonnable

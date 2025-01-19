@@ -17,6 +17,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
 import { useRoute } from '@react-navigation/native';
+import AppURL from '@/components/src/URL';
+
 
 type Phone = {
     _id: string;
@@ -25,6 +27,7 @@ type Phone = {
     supplier: string;
     model: string;
     functional: boolean;
+    comment: string;
 };
 type User = {
     _id: string;
@@ -40,7 +43,6 @@ type User = {
     expoPushToken?: string;
 };
 
-const URL_Phones = 'https://coral-app-wqv9l.ondigitalocean.app/api/phones';
 
 const Phones: React.FC = () => {
     const route = useRoute();
@@ -61,12 +63,13 @@ const Phones: React.FC = () => {
         supplier: '',
         model: '',
         functional: true,
+        comment: '', // Nouveau champ
     });
 
     const fetchPhones = async () => {
         setLoading(true);
         try {
-            const response = await axios.get<Phone[]>(`${URL_Phones}/phones?dsp_code=${user.dsp_code}`);
+            const response = await axios.get<Phone[]>(`${AppURL}/api/phones/phones?dsp_code=${user.dsp_code}`);
             setPhones(response.data);
             setFilteredPhones(response.data); // Initialiser les téléphones filtrés
             setError(null);
@@ -124,11 +127,12 @@ const Phones: React.FC = () => {
                 supplier: phone.supplier,
                 model: phone.model,
                 functional: phone.functional,
+                comment: phone.comment,
             });
             setIsEditing(true);
         } else {
             setSelectedPhone(null);
-            setPhoneDetails({ name: '', number: '', supplier: '', model: '', functional: true });
+            setPhoneDetails({ name: '', number: '', supplier: '', model: '', functional: true, comment: '' });
             setIsEditing(false);
         }
         setModalVisible(true);
@@ -144,7 +148,7 @@ const Phones: React.FC = () => {
     };
 
     const handleAddPhone = async () => {
-        const { name, number, supplier, model } = phoneDetails;
+        const { name, number, supplier, model, comment } = phoneDetails;
 
         if (!name || !number || !supplier || !model) {
             Alert.alert(
@@ -155,7 +159,14 @@ const Phones: React.FC = () => {
         }
 
         try {
-            const response = await axios.post<Phone>(`${URL_Phones}/phones/create?dsp_code=${user.dsp_code}`, phoneDetails);
+            const response = await axios.post<Phone>(`${AppURL}/api/phones/phones/create?dsp_code=${user.dsp_code}`, {
+                name,
+                number,
+                supplier,
+                model,
+                functional: phoneDetails.functional,
+                comment, // Nouveau champ
+            });
             setPhones((prev) => [...prev, response.data]);
             setFilteredPhones((prev) => [...prev, response.data]); // Mettre à jour les résultats filtrés
             Alert.alert('Success', 'Phone added successfully!');
@@ -165,13 +176,21 @@ const Phones: React.FC = () => {
         }
     };
 
+
     const handleUpdatePhone = async () => {
         if (!selectedPhone) return;
 
         try {
             const response = await axios.put<Phone>(
-                `${URL_Phones}/phones/${selectedPhone._id}?dsp_code=${user.dsp_code}`,
-                phoneDetails
+                `${AppURL}/api/phones/phones/${selectedPhone._id}?dsp_code=${user.dsp_code}`,
+                {
+                    name: phoneDetails.name,
+                    number: phoneDetails.number,
+                    supplier: phoneDetails.supplier,
+                    model: phoneDetails.model,
+                    functional: phoneDetails.functional,
+                    comment: phoneDetails.comment, // Nouveau champ
+                }
             );
             setPhones((prev) =>
                 prev.map((phone) => (phone._id === selectedPhone._id ? response.data : phone))
@@ -186,11 +205,12 @@ const Phones: React.FC = () => {
         }
     };
 
+
     const handleDeletePhone = async () => {
         if (!selectedPhone) return;
 
         try {
-            await axios.delete(`${URL_Phones}/phones/${selectedPhone._id}?dsp_code=${user.dsp_code}`);
+            await axios.delete(`${AppURL}/api/phones/phones/${selectedPhone._id}?dsp_code=${user.dsp_code}`);
             setPhones((prev) => prev.filter((phone) => phone._id !== selectedPhone._id));
             setFilteredPhones((prev) => prev.filter((phone) => phone._id !== selectedPhone._id));
             Alert.alert('Success', 'Phone deleted successfully!');
@@ -295,6 +315,16 @@ const Phones: React.FC = () => {
                             value={phoneDetails.model}
                             onChangeText={(text) => setPhoneDetails({ ...phoneDetails, model: text })}
                             placeholder={user.language === 'English' ? 'Enter phone model' : 'Entrez le modèle du téléphone'}
+                        />
+                        <TextInput
+                            style={styles.input}
+                            value={phoneDetails.comment || ''} // Utilisez une chaîne vide comme valeur par défaut
+                            onChangeText={(text) => setPhoneDetails({ ...phoneDetails, comment: text })}
+                            placeholder={
+                                user.language === 'English'
+                                    ? 'Enter a comment'
+                                    : 'Entrez un commentaire'
+                            }
                         />
 
 

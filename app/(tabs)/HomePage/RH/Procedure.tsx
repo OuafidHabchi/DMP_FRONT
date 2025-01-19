@@ -13,7 +13,7 @@ import {
 import { useRoute } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import axios from 'axios';
-
+import AppURL from '@/components/src/URL';
 // Définir le type User
 type User = {
     _id: string;
@@ -66,28 +66,22 @@ const Procedure = () => {
     const [employees, setEmployees] = useState<Employee[]>([]); // Liste des employés
     const [seenModalVisible, setSeenModalVisible] = useState(false); // Contrôle du modal
     const [seenEmployees, setSeenEmployees] = useState<Employee[]>([]); // Employés qui ont vu
-
-
-    const API_URL = 'https://coral-app-wqv9l.ondigitalocean.app/api/procedure';
-    const URL_Employees = 'https://coral-app-wqv9l.ondigitalocean.app/api';
-
     useEffect(() => {
         const fetchEmployees = async () => {
             try {
-                const response = await axios.get<Employee[]>(`${URL_Employees}/employee?dsp_code=${user.dsp_code}`);
+                const response = await axios.get<Employee[]>(`${AppURL}/api/employee?dsp_code=${user.dsp_code}`);
                 setEmployees(response.data);
             } catch (err) {
                 console.error('Error fetching employees:', err);
             }
         };
-
         fetchEmployees();
     }, []);
 
     const handleSeenClick = async (procedure: Procedure) => {
         try {
             // Recharger les employés avant d'afficher le modal
-            const response = await axios.get<Employee[]>(`${URL_Employees}/employee?dsp_code=${user.dsp_code}`);
+            const response = await axios.get<Employee[]>(`${AppURL}/api/employee?dsp_code=${user.dsp_code}`);
             setEmployees(response.data);
 
             // Filtrer les employés qui ont vu la procédure
@@ -102,8 +96,8 @@ const Procedure = () => {
         setIsLoading(true); // Démarre le chargement
         try {
             const [proceduresResponse, employeesResponse] = await Promise.all([
-                axios.get<Procedure[]>(`${API_URL}/?dsp_code=${user.dsp_code}`), // Récupérer les procédures
-                axios.get<Employee[]>(`${URL_Employees}/employee?dsp_code=${user.dsp_code}`), // Récupérer les employés
+                axios.get<Procedure[]>(`${AppURL}/api/procedure/?dsp_code=${user.dsp_code}`), // Récupérer les procédures
+                axios.get<Employee[]>(`${AppURL}/api/employee?dsp_code=${user.dsp_code}`), // Récupérer les employés
             ]);
 
             setProcedures(proceduresResponse.data); // Met à jour les procédures
@@ -124,7 +118,7 @@ const Procedure = () => {
         const fetchProcedures = async () => {
             try {
                 setIsLoading(true);
-                const response = await axios.get<Procedure[]>(`${API_URL}/?dsp_code=${user.dsp_code}`);
+                const response = await axios.get<Procedure[]>(`${AppURL}/api/procedure/?dsp_code=${user.dsp_code}`);
                 setProcedures(response.data);
             } catch (err) {
                 console.error('Error fetching procedures:', err);
@@ -151,7 +145,7 @@ const Procedure = () => {
         };
 
         try {
-            const response = await axios.post(`${API_URL}?dsp_code=${user.dsp_code}`, procedureData);
+            const response = await axios.post(`${AppURL}/api/procedure?dsp_code=${user.dsp_code}`, procedureData);
             setProcedures(prev => [response.data, ...prev]);
             setModalVisible(false);
             resetForm();
@@ -171,7 +165,7 @@ const Procedure = () => {
         };
 
         try {
-            const response = await axios.put(`${API_URL}/${selectedProcedure._id}?dsp_code=${user.dsp_code}`, updatedProcedure);
+            const response = await axios.put(`${AppURL}/api/procedure/${selectedProcedure._id}?dsp_code=${user.dsp_code}`, updatedProcedure);
             setProcedures(prev =>
                 prev.map(proc => (proc._id === selectedProcedure._id ? response.data : proc))
             );
@@ -185,7 +179,7 @@ const Procedure = () => {
     // Gérer la suppression d'une procédure sans confirmation
     const handleDeleteProcedure = async (procedureId: string) => {
         try {
-            await axios.delete(`${API_URL}/${procedureId}?dsp_code=${user.dsp_code}`); // Effectuer la requête de suppression
+            await axios.delete(`${AppURL}/api/procedure/${procedureId}?dsp_code=${user.dsp_code}`); // Effectuer la requête de suppression
             setProcedures(prev => prev.filter(proc => proc._id !== procedureId)); // Mettre à jour la liste des procédures
             setEditModalVisible(false); // Fermer le modal après suppression
         } catch (err) {

@@ -83,18 +83,23 @@ const WeeklyRecap = () => {
     const fetchData = async () => {
       setLoading(true); // Start loading
       try {
-        const employeesResponse = await axios.get(`${AppURL}/api/employee?dsp_code=${user.dsp_code}`);
-        const shiftsResponse = await axios.get(`${AppURL}/api/shifts/shifts?dsp_code=${user.dsp_code}`);
-        const dispoResponse = await axios.get(`${AppURL}/api/disponibilites/disponibilites?dsp_code=${user.dsp_code}`);
-        const timeCardsResponse = await axios.get(`${AppURL}/api/timecards/timecards?dsp_code=${user.dsp_code}`);
+        // Lancer toutes les requêtes en parallèle avec Promise.all
+        const [employeesResponse, shiftsResponse, dispoResponse, timeCardsResponse] = await Promise.all([
+          axios.get(`${AppURL}/api/employee?dsp_code=${user.dsp_code}`),
+          axios.get(`${AppURL}/api/shifts/shifts?dsp_code=${user.dsp_code}`),
+          axios.get(`${AppURL}/api/disponibilites/disponibilites?dsp_code=${user.dsp_code}`),
+          axios.get(`${AppURL}/api/timecards/timecards?dsp_code=${user.dsp_code}`)
+        ]);
 
         setEmployees(employeesResponse.data);
         setShifts(shiftsResponse.data);
-        // Filter only confirmed disponibilités
+
+        // Filtrer les disponibilités confirmées
         const confirmedDispos = dispoResponse.data.filter(
           (dispo: Disponibility) => dispo.presence === 'confirmed'
         );
         setDisponibilities(confirmedDispos);
+
         setTimeCards(timeCardsResponse.data); // Store time cards data
         setFilteredEmployees(employeesResponse.data); // Initialize filtered employees
       } catch (error) {
@@ -103,6 +108,7 @@ const WeeklyRecap = () => {
         setLoading(false); // End loading
       }
     };
+
 
     fetchData();
     setCurrentWeekDates(getWeekDates(weekOffset)); // Initialize with the current week
@@ -191,14 +197,15 @@ const WeeklyRecap = () => {
         style={styles.searchBar}
         placeholder={
           user.language === 'English' ? 'Search employee by name' : 'Rechercher un employé par nom'
-        }        
+        }
         value={searchQuery}
         onChangeText={(text) => setSearchQuery(text)}
       />
 
       {/* Loading spinner or content */}
       {loading ? (
-        <ActivityIndicator size="large" color="#fff" />
+        <ActivityIndicator size="large" color="#001933" />
+        
       ) : (
         <ScrollView style={styles.table}>
           {/* Weekly view table */}
@@ -238,8 +245,8 @@ const WeeklyRecap = () => {
                       {shift ? (
                         <Text style={styles.shiftText}>
                           {Platform.OS === 'web'
-                            ? `${shift.name} - ${hoursWorked.toFixed(2)} h` 
-                            : `${hoursWorked.toFixed(2)} h`}               
+                            ? `${shift.name} - ${hoursWorked.toFixed(2)} h`
+                            : `${hoursWorked.toFixed(2)} h`}
                         </Text>
                       ) : (
                         <Text style={styles.shiftText}>{`${hoursWorked.toFixed(2)}`}</Text>

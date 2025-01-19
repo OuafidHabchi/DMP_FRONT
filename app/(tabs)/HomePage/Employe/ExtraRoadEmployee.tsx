@@ -11,6 +11,8 @@ import {
 import { useRoute } from '@react-navigation/native';
 import axios from 'axios';
 import { MaterialIcons } from '@expo/vector-icons';
+import AppURL from '@/components/src/URL';
+
 
 type User = {
     _id: string;
@@ -41,21 +43,17 @@ type Road = {
 const ExtraRoadEmployee = () => {
     const route = useRoute();
     const { user } = route.params as { user: User };
-
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [roads, setRoads] = useState<Road[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [selectedRoad, setSelectedRoad] = useState<Road | null>(null);
     const [modalVisible, setModalVisible] = useState(false);
-
-    const URL_Extra_Road = 'https://coral-app-wqv9l.ondigitalocean.app';
-
     useEffect(() => {
         const fetchRoadsByDate = async () => {
             try {
                 setIsLoading(true);
                 const response = await axios.get<Road[]>(
-                    `${URL_Extra_Road}/api/roads/bydate/get?dsp_code=${user.dsp_code}`,
+                    `${AppURL}/api/roads/bydate/get?dsp_code=${user.dsp_code}`,
                     {
                         params: {
                             date: selectedDate.toISOString().split('T')[0],
@@ -99,7 +97,7 @@ const ExtraRoadEmployee = () => {
                 prev.map((r) => (r._id === road._id ? updatedRoad : r))
             );
 
-            await axios.put(`${URL_Extra_Road}/api/roads/${road._id}?dsp_code=${user.dsp_code}`, {
+            await axios.put(`${AppURL}/api/roads/${road._id}?dsp_code=${user.dsp_code}`, {
                 seen: updatedRoad.seen,
             });
         } catch (err) {
@@ -119,7 +117,7 @@ const ExtraRoadEmployee = () => {
                     prev.map((r) => (r._id === selectedRoad._id ? updatedRoad : r))
                 );
 
-                await axios.put(`${URL_Extra_Road}/api/roads/${selectedRoad._id}?dsp_code=${user.dsp_code}`, {
+                await axios.put(`${AppURL}/api/roads/${selectedRoad._id}?dsp_code=${user.dsp_code}`, {
                     interested: updatedRoad.interested,
                 });
 
@@ -143,7 +141,7 @@ const ExtraRoadEmployee = () => {
                     prev.map((r) => (r._id === selectedRoad._id ? updatedRoad : r))
                 );
 
-                await axios.put(`${URL_Extra_Road}/api/roads/${selectedRoad._id}?dsp_code=${user.dsp_code}`, {
+                await axios.put(`${AppURL}/api/roads/${selectedRoad._id}?dsp_code=${user.dsp_code}`, {
                     notInterested: updatedRoad.notInterested,
                 });
 

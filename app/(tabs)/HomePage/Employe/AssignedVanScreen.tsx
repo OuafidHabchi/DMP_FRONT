@@ -7,7 +7,11 @@ import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'react-native'; // Pour afficher l'aperçu de l'image
 import * as FileSystem from 'expo-file-system';
 import Icon from 'react-native-vector-icons/FontAwesome'; // Import des icônes
+import * as ImageManipulator from 'expo-image-manipulator';
 import AppURL from '@/components/src/URL';
+import CameraCaptureButton from '@/components/src/CameraCaptureButton';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 
 type User = {
   _id: string;
@@ -40,7 +44,9 @@ const AssignedVanScreen = () => {
   const [hasStartedWork, setHasStartedWork] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null); // État pour stocker l'image sélectionnée
-
+  const [isCameraVisible, setIsCameraVisible] = useState<'prepic' | 'postpic' | false>(false);
+  const [prePicStatus, setPrePicStatus] = useState<string | null>(null);
+  const [postPicStatus, setPostPicStatus] = useState<string | null>(null);
   const setFileUri = (uri: string) => {
     setSelectedImage(uri);
   };
@@ -56,16 +62,34 @@ const AssignedVanScreen = () => {
       );
       return;
     }
+
     let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images, // Backward-compatible
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
-      quality: 1,
+      quality: 1, // High quality
     });
+
     if (!result.canceled && result.assets && result.assets.length > 0) {
-      setFileUri(result.assets[0].uri); // Save the URI of the selected image
+      try {
+        // Redimensionner l'image à une largeur maximale de 800px
+        const manipulatedImage = await ImageManipulator.manipulateAsync(
+          result.assets[0].uri,
+          [{ resize: { width: 700 } }], // Ajustez la taille ici
+          { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG } // Compression et format
+        );
+
+        setFileUri(manipulatedImage.uri); // Sauvegarder l'image redimensionnée
+      } catch (error) {
+        console.error("Error resizing the image:", error);
+        Alert.alert(
+          user.language === 'English' ? "Error" : "Erreur",
+          user.language === 'English'
+            ? "Failed to resize the image."
+            : "Échec du redimensionnement de l'image."
+        );
+      }
     }
   };
-
 
 
   const fetchTodayVanAssignment = async () => {
@@ -129,15 +153,30 @@ const AssignedVanScreen = () => {
     console.log(currentTime);
 
     try {
-      // Envoie une requête PUT pour mettre à jour la fiche de temps avec l'heure de fin
+      // Envoie une requête PUT pour mettre à jour la fiche de temps avec l'heure de début
       await axios.put(`${URL_TimeCard}/timecards/${user._id}/${today}?dsp_code=${user.dsp_code}`, {
-        startTime: currentTime, // Heure de fin au format HH:MM
-
+        startTime: currentTime, // Heure de début au format HH:MM
       });
+
+      // Vérifie les valeurs dans AsyncStorage et les met à jour
+      const prePicStatus = await AsyncStorage.getItem('prepic');
+      const postPicStatus = await AsyncStorage.getItem('postpic');
+
+      // Si les valeurs existent déjà, on les met à jour
+      if (prePicStatus !== null && postPicStatus !== null) {
+        await AsyncStorage.setItem('prepic', 'true');  // Mettre 'true' pour prepic
+        await AsyncStorage.setItem('postpic', 'false'); // Mettre 'false' pour postpic
+      } else {
+        // Si les valeurs ne sont pas présentes, les initialiser
+        await AsyncStorage.setItem('prepic', 'true');
+        await AsyncStorage.setItem('postpic', 'false');
+      }
+
     } catch (error) {
       console.error("Error starting work:", error);
     }
   };
+
 
   const handleEndWork = async () => {
     // Récupère l'heure de fin de travail au format HH:MM
@@ -277,6 +316,11 @@ const AssignedVanScreen = () => {
       return;
     }
     setIsSubmitting(true); // Désactive l'effet de chargement
+    const currentTime = new Date().toLocaleTimeString('en-GB', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
 
     const formData = new FormData();
     formData.append("problemDescription", problemDescription);
@@ -292,6 +336,7 @@ const AssignedVanScreen = () => {
     formData.append("today", new Date().toDateString());
     formData.append("expoPushToken", user.expoPushToken);
     formData.append("role", user.role);
+    formData.append("time", currentTime); // Ajouter l'heure actuelle
 
     if (selectedImage) {
       try {
@@ -328,9 +373,8 @@ const AssignedVanScreen = () => {
       const response = await fetch(`${AppURL}/api/dailyNotes/create?dsp_code=${user.dsp_code}`, {
         method: 'POST',
         body: formData,
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+        headers: {}, // Laissez-le vide
+
       });
 
       if (response.ok) {
@@ -372,18 +416,46 @@ const AssignedVanScreen = () => {
 
 
   useEffect(() => {
-    fetchTodayVanAssignment();
-    checkExistingTimeCard();
-  }, []);
-
+    // Fonction pour récupérer les informations du van assigné et la fiche de temps
+    const fetchData = async () => {
+      await Promise.all([
+        fetchTodayVanAssignment(), // Récupère les informations du van assigné
+        checkExistingTimeCard(),   // Vérifie les informations de la fiche de temps
+      ]);
+  
+      // Vérifier et mettre à jour le statut des photos dans AsyncStorage
+      const prePicStatus = await AsyncStorage.getItem('prepic');
+      const postPicStatus = await AsyncStorage.getItem('postpic');
+  
+      // Mettre à jour les états avec les valeurs récupérées
+      setPrePicStatus(prePicStatus);
+      setPostPicStatus(postPicStatus);
+    };
+  
+    fetchData();
+  }, []); // Ce useEffect sera exécuté une seule fois lors du montage du composant
+  
   const onRefresh = useCallback(() => {
     setRefreshing(true);
+    
+    // Vérifier les données et les statuts de photo à chaque actualisation
     Promise.all([
-      fetchTodayVanAssignment(), // Récupère les informations du van assigné
-      checkExistingTimeCard(),   // Vérifie les informations de la fiche de temps
+      fetchTodayVanAssignment(),  // Récupère les informations du van assigné
+      checkExistingTimeCard(),    // Vérifie les informations de la fiche de temps
     ])
-      .finally(() => setRefreshing(false));
+      .then(async () => {
+        // Vérifier à nouveau les statuts de prepic et postpic dans le local storage
+        const prePicStatus = await AsyncStorage.getItem('prepic');
+        const postPicStatus = await AsyncStorage.getItem('postpic');
+  
+        // Mettre à jour les états avec les valeurs récupérées
+        setPrePicStatus(prePicStatus);
+        setPostPicStatus(postPicStatus);
+      })
+      .finally(() => setRefreshing(false));  // Arrêter le rafraîchissement après avoir terminé
   }, []);
+  
+  
 
 
   const openProblemModal = (type: string) => {
@@ -435,13 +507,33 @@ const AssignedVanScreen = () => {
         </TouchableOpacity>
       ) : (
         <>
-          <View>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginVertical: 10 }}>
+            {/* QR Code Button */}
             <TouchableOpacity onPress={() => setIsQRModalVisible(true)} style={styles.qrButton}>
               <Text style={styles.qrButtonText}>
                 {user.language === 'English' ? 'QR Code' : 'Code QR'}
               </Text>
             </TouchableOpacity>
+
+            {/* Camera Button */}
+            {prePicStatus === 'true' && (
+              <TouchableOpacity onPress={() => setIsCameraVisible('prepic')} style={styles.qrButton}>
+                <Text style={styles.qrButtonText}>
+                  {user.language === 'English' ? 'Take Pre-Pic' : 'Prendre une photo (avant)'}
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {/* Afficher le bouton Post-Pic si postpic est true */}
+            {postPicStatus === 'true' && (
+              <TouchableOpacity onPress={() => setIsCameraVisible('postpic')} style={styles.qrButton}>
+                <Text style={styles.qrButtonText}>
+                  {user.language === 'English' ? 'Take Post-Pic' : 'Prendre une photo (après)'}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
+
 
           <View style={styles.headerContainer}>
             <Text style={styles.title}>
@@ -520,6 +612,38 @@ const AssignedVanScreen = () => {
           </View>
         </View>
       </Modal>
+
+      <Modal visible={isCameraVisible !== false} animationType="slide">
+        <View style={{ flex: 1 }}>
+          {isCameraVisible !== false && (
+            <CameraCaptureButton
+              employeeName={user.name}
+              employeeFamilyName={user.familyName}
+              vanName={assignedVanNameForToday || "Unknown Van"}
+              dspCode={user.dsp_code}
+              userId={user._id}
+              photoType={isCameraVisible} // 'prepic' ou 'postpic'
+              onSuccess={async () => {
+                // Fermer le modal après succès
+                setIsCameraVisible(false);
+
+                // Vérifier quel type de photo a été pris et inverser les valeurs
+                if (isCameraVisible === 'prepic') {
+                  // Si c'est 'prepic', on met 'prepic' à false et 'postpic' à true
+                  await AsyncStorage.setItem('prepic', 'false');
+                  await AsyncStorage.setItem('postpic', 'true');
+                } else if (isCameraVisible === 'postpic') {
+                  // Si c'est 'postpic', on met 'postpic' à false et 'prepic' à true
+                  await AsyncStorage.setItem('postpic', 'false');
+                  await AsyncStorage.setItem('prepic', 'false');
+                }
+              }} // Fermer le modal après succès et inverser les valeurs
+            />
+          )}
+        </View>
+      </Modal>
+
+
 
 
       {/* Problem Report Modal */}

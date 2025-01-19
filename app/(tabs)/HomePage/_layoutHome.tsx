@@ -7,7 +7,6 @@ import Acceuil from './Acceuil';
 import Profile from './Profile';
 import Dispatche from './Dispatche';
 import Messenger from './Messenger';
-// import Schedule from './Schedule';
 import shifts from './RH/shifts';
 import Employees_Avaibilities from './RH/Employees Avaibilities';
 import { MaterialIcons, FontAwesome } from '@expo/vector-icons';
@@ -45,10 +44,7 @@ import Inventory from './Dispatcher/Inventory';
 import CortexPrediction from './Dispatcher/CortexPrediction';
 import CortexVsDa from './RH/CortexVsDa';
 import AppURL from '@/components/src/URL';
-
-
-
-// Define types for the tab and drawer navigation
+import AsyncStorage from '@react-native-async-storage/async-storage';
 // types.ts
 export type User = {
   _id: string;
@@ -720,7 +716,7 @@ export default function _layoutHome() {
   const checkUnreadMessages = async () => {
     try {
       const response = await axios.get(
-        `${AppURL}/api/conversations/unreadStatus/${user._id}`,
+        `${AppURL}/api/conversations/conversations/unreadStatus/${user._id}`,
         {
           params: {
             dsp_code: user.dsp_code, // Ajout du dsp_code comme paramètre
@@ -747,9 +743,20 @@ export default function _layoutHome() {
     setHasUnreadMessages(status);
   };
 
-  const handleSignOut = () => {
-    navigation.navigate('Sign_In');
+  const handleSignOut = async () => {
+    try {
+      // Supprimer les informations de connexion de AsyncStorage
+      await AsyncStorage.removeItem('email');
+      await AsyncStorage.removeItem('password');
+      await AsyncStorage.removeItem('Dsp_Code');
+  
+      // Navigation vers la page de connexion
+      navigation.navigate('Sign_In');
+    } catch (error) {
+      console.error('Error clearing AsyncStorage during sign out:', error);
+    }
   };
+  
 
   return (
     <View style={{ flex: 1 }}>

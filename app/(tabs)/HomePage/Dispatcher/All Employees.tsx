@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, View, FlatList, TouchableOpacity, Modal, TextInput, Pressable, Alert, RefreshControl, Platform, ScrollView } from 'react-native';
+import { StyleSheet, Text, View, FlatList, TouchableOpacity, Modal, TextInput, Pressable, Alert, RefreshControl, Platform, ScrollView, ActivityIndicator } from 'react-native';
 import axios from 'axios';
-import { Picker } from '@react-native-picker/picker'; // Import Picker
 import { useRoute } from '@react-navigation/native';
 import AppURL from '@/components/src/URL';
+import PickerModal from '@/components/src/PickerModal';
 
 // Base URL without protocol or port
 const URL = AppURL;
@@ -44,6 +44,7 @@ const AllEmployees = () => {
   const [newEmployeeModalVisible, setNewEmployeeModalVisible] = useState(false);
   const [updatedEmployee, setUpdatedEmployee] = useState<Employee | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [newEmployee, setNewEmployee] = useState({
     name: '',
     familyName: '',
@@ -62,6 +63,7 @@ const AllEmployees = () => {
   }, []);
 
   const fetchEmployees = async () => {
+    setLoading(true); // Début du chargement
     try {
       const response = await axios.get(`${URL}/api/employee`, {
         params: { dsp_code: user.dsp_code },
@@ -70,8 +72,11 @@ const AllEmployees = () => {
       setFilteredEmployees(response.data);
     } catch (error) {
       console.error('Error fetching employees:', error);
+    } finally {
+      setLoading(false); // Fin du chargement
     }
   };
+
 
 
   const onRefresh = () => {
@@ -177,10 +182,20 @@ const AllEmployees = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>
-        {user.language === 'English' ? 'Employee List' : 'Liste des employés'}
-      </Text>
+  <Text style={styles.title}>
+    {user.language === 'English' ? 'Employee List' : 'Liste des employés'}
+  </Text>
 
+  {/* Loading indicator */}
+  {loading ? (
+    <View style={styles.loadingContainer}>
+      <ActivityIndicator size="large" color="#001933" />
+      <Text style={styles.loadingText}>
+        {user.language === 'English' ? 'Loading...' : 'Chargement...'}
+      </Text>
+    </View>
+  ) : (
+    <>
       {/* Add a button to refresh the employee list and a search bar */}
       <View style={styles.buttonContainer}>
         <TextInput
@@ -206,7 +221,6 @@ const AllEmployees = () => {
           {filteredEmployees.map((item) => (
             <TouchableOpacity
               key={item._id}
-
               style={[styles.employeeItem, { backgroundColor: getBackgroundColor(item.scoreCard) }]}
               onPress={() => handleOpenModal(item)} // Ouvre le modal avec les détails
             >
@@ -224,7 +238,6 @@ const AllEmployees = () => {
             <TouchableOpacity
               style={[styles.employeeItem, { backgroundColor: getBackgroundColor(item.scoreCard) }]}
               onPress={() => handleOpenModal(item)} // Ouvre le modal avec les détails
-
             >
               <Text style={styles.employeeText}>
                 {item.name} {item.familyName} - {item.scoreCard}
@@ -234,12 +247,15 @@ const AllEmployees = () => {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         />
       )}
+
       <Pressable
         style={styles.floatingButton}
         onPress={() => setNewEmployeeModalVisible(true)} // Afficher le modal
       >
         <Text style={styles.floatingButtonText}>+</Text>
       </Pressable>
+    </>
+  )}
 
       {/* Modal to add a new employee */}
       <Modal visible={newEmployeeModalVisible} animationType="slide" transparent={true}>
@@ -294,16 +310,16 @@ const AllEmployees = () => {
             {user.language === 'English' ? 'Role' : 'Rôle'}
           </Text>
 
-          <View style={styles.pickerContainer}>
-            <Picker
-              selectedValue={newEmployee.role}
-              style={styles.picker}
-              onValueChange={(itemValue: string) => setNewEmployee({ ...newEmployee, role: itemValue })}
-            >
-              <Picker.Item label="Driver" value="driver" />
-              <Picker.Item label="Manager" value="manager" />
-            </Picker>
-          </View>
+          <PickerModal
+            title="Select Role" // Texte utilisé comme placeholder ou première option
+            options={[
+              { label: 'Driver', value: 'driver' },
+              { label: 'Manager', value: 'manager' },
+            ]}
+            selectedValue={newEmployee.role}
+            onValueChange={(value) => setNewEmployee({ ...newEmployee, role: value })}
+          />
+
           <Pressable style={styles.buttonAdd} onPress={handleAddEmployee}>
             <Text style={styles.buttonText}>
               {user.language === 'English' ? 'Add' : 'Ajouter'}
@@ -372,16 +388,18 @@ const AllEmployees = () => {
               {user.language === 'English' ? 'Role' : 'Rôle'}
             </Text>
 
-            <View style={styles.pickerContainer}>
-              <Picker
-                selectedValue={updatedEmployee?.role}
-                style={styles.picker}
-                onValueChange={(itemValue: string) => setUpdatedEmployee({ ...updatedEmployee!, role: itemValue })}
-              >
-                <Picker.Item label="Driver" value="driver" />
-                <Picker.Item label="Manager" value="manager" />
-              </Picker>
-            </View>
+            <PickerModal
+              title="Select Role" // Texte utilisé comme placeholder ou première option
+              options={[
+                { label: 'Driver', value: 'driver' },
+                { label: 'Manager', value: 'manager' },
+              ]}
+              selectedValue={updatedEmployee?.role || ''} // Gestion des cas où updatedEmployee pourrait être null
+              onValueChange={(value) =>
+                setUpdatedEmployee((prev) => ({ ...prev!, role: value }))
+              }
+            />
+
             <Text style={styles.label}>Score: {updatedEmployee?.scoreCard}</Text>
 
             <View style={styles.modalButtonContainer}>
@@ -414,6 +432,15 @@ const AllEmployees = () => {
 export default AllEmployees;
 
 const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 18,
+    color: '#001933', // Couleur bleu foncé pour le texte
+  },
   floatingButton: {
     position: 'absolute',
     bottom: 20, // Distance du bas de la page
