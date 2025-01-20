@@ -1,8 +1,6 @@
 import { registerRootComponent } from 'expo';
-
+import './firebaseConfig'; // Importez votre fichier Firebase ici
 import App from './App';
 
-// registerRootComponent calls AppRegistry.registerComponent('main', () => App);
-// It also ensures that whether you load the app in Expo Go or in a native build,
-// the environment is set up appropriately
+// Assurez-vous que Firebase est initialisé avant de démarrer l'application
 registerRootComponent(App);

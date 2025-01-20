@@ -580,20 +580,6 @@ function ScheduleDrawer({ route }: { route: RouteProp<RootTabParamList, 'Schedul
       }}
     >
       <Drawer.Screen
-        name="AllEmployees"
-        component={AllEmployees}
-        initialParams={{ user }}
-        options={{
-          drawerLabel: user.language === 'English' ? 'All Employees' : 'Tous les Employés',
-          drawerIcon: ({ color = "#001933", size }) => (
-            <Ionicons name="people" size={size} color={color} />
-          ),
-          headerTitle: user.language === 'English' ? 'All Employees' : 'Tous les Employés', // Customize header title if needed
-        }}
-      />
-
-
-      <Drawer.Screen
         name="WeeklyRecap"
         component={WeeklyRecap}
         initialParams={{ user }}

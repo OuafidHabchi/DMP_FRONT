@@ -739,61 +739,85 @@ const ClothesManagement: React.FC = () => {
 
 
       {/* Stock Modal  */}
-      <Modal visible={isStockModalVisible} animationType="slide">
-        <View style={styles.stockModalContent}>
-          {/* Header */}
-          <Text style={styles.stockModalHeader}>Stock</Text>
-
-          {/* List of Clothes */}
-          <FlatList
-            data={calculateRemainingQuantities()}
-            keyExtractor={(item) => item._id}
-            renderItem={({ item }) => (
-              <View style={styles.stockCard}>
-                {/* Icon for the clothing */}
-                <View style={styles.stockIcon}>
-                  <Text style={styles.stockIconText}>👕</Text>
-                </View>
-
-                {/* Text Information */}
-                <View style={styles.stockCardTextContainer}>
-                  <Text style={styles.stockCardTitle}>
-                    {user.language === 'English'
-                      ? `${item.type} - Size: ${item.size}`
-                      : `${item.type} - Taille : ${item.size}`}
-                  </Text>
-                  <Text style={styles.stockCardSubtitle}>
-                    {user.language === 'English'
-                      ? `Remaining Quantity: `
-                      : `Quantité Restante: `}
-                    <Text
-                      style={[
-                        styles.stockCardHighlight,
-                        item.remaining <= 10 && styles.stockCardLowQuantity, // Conditional styling
-                      ]}
-                    >
-                      {item.remaining}
-                    </Text>
-                  </Text>
-
-                </View>
-              </View>
-            )}
-          />
-
-          {/* Footer with Close Button */}
-          <TouchableOpacity style={styles.stockCloseButton} onPress={closeStockModal}>
-            <Text style={styles.stockCloseButtonText}>
-              {user.language === 'English' ? 'Close' : 'Fermer'}
+      <Modal visible={isStockModalVisible} animationType="slide" transparent>
+        <View style={styles.stockModalBackdrop}>
+          <View style={styles.stockModalContent}>
+            {/* Header */}
+            <Text style={styles.stockModalHeader}>
+              {user.language === 'English' ? 'Stock' : 'Stock'}
             </Text>
-          </TouchableOpacity>
+
+            {/* List of Clothes */}
+            <FlatList
+              data={calculateRemainingQuantities()}
+              keyExtractor={(item) => item._id}
+              contentContainerStyle={{ flexGrow: 1, paddingBottom: 20 }} // Ajoute un espace supplémentaire pour scroller
+              renderItem={({ item }) => (
+                <View style={styles.stockCard}>
+                  {/* Icon for the clothing */}
+                  <View style={styles.stockIcon}>
+                    <Text style={styles.stockIconText}>👕</Text>
+                  </View>
+
+                  {/* Text Information */}
+                  <View style={styles.stockCardTextContainer}>
+                    <Text style={styles.stockCardTitle}>
+                      {user.language === 'English'
+                        ? `${item.type} - Size: ${item.size}`
+                        : `${item.type} - Taille : ${item.size}`}
+                    </Text>
+                    <Text style={styles.stockCardSubtitle}>
+                      {user.language === 'English'
+                        ? `Remaining Quantity: `
+                        : `Quantité Restante: `}
+                      <Text
+                        style={[
+                          styles.stockCardHighlight,
+                          item.remaining <= 10 && styles.stockCardLowQuantity, // Conditional styling
+                        ]}
+                      >
+                        {item.remaining}
+                      </Text>
+                    </Text>
+                  </View>
+                </View>
+              )}
+              ListEmptyComponent={
+                <Text style={styles.emptyText}>
+                  {user.language === 'English'
+                    ? 'No items in stock.'
+                    : 'Aucun article en stock.'}
+                </Text>
+              }
+            />
+
+            {/* Footer with Close Button */}
+            <TouchableOpacity style={styles.stockCloseButton} onPress={closeStockModal}>
+              <Text style={styles.stockCloseButtonText}>
+                {user.language === 'English' ? 'Close' : 'Fermer'}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </Modal>
+
+
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  stockModalBackdrop: {
+    flex: 1,
+    justifyContent: 'flex-end', // Place le modal en bas
+    backgroundColor: 'rgba(0, 0, 0, 0.5)', // Fond semi-transparent
+  },
+  emptyText: {
+    textAlign: 'center',
+    color: '#555',
+    fontSize: 16,
+    marginTop: 20,
+  },
   container: {
     flex: 1,
     padding: 20,

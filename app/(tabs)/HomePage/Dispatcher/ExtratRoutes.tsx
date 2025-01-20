@@ -71,60 +71,73 @@ const ExtratRoutes = () => {
   // Charger les employés au démarrage
   useEffect(() => {
     const fetchEmployees = async () => {
-        try {
-            setIsLoading(true);
-            const response = await axios.get<Employee[]>(`${AppURL}/api/employee`, {
-                params: {
-                    dsp_code: user.dsp_code, // Ajout de dsp_code
-                },
-            });
-            setEmployees(response.data);
-        } catch (err) {
-            console.error('Error fetching employees:', err);
-        } finally {
-            setIsLoading(false);
-        }
+      try {
+        setIsLoading(true);
+        const response = await axios.get<Employee[]>(`${AppURL}/api/employee`, {
+          params: {
+            dsp_code: user.dsp_code, // Ajout de dsp_code
+          },
+        });
+        setEmployees(response.data);
+      } catch (err) {
+        console.error('Error fetching employees:', err);
+      } finally {
+        setIsLoading(false);
+      }
     };
     fetchEmployees();
-}, [user.dsp_code]); // Ajout de `user.dsp_code` comme dépendance pour éviter les erreurs
+  }, [user.dsp_code]); // Ajout de `user.dsp_code` comme dépendance pour éviter les erreurs
 
 
   // Charger les routes pour la date sélectionnée
   useEffect(() => {
     const fetchRoadsByDate = async (date: string) => {
-        try {
-            setIsLoading(true); // Affiche un indicateur de chargement
-            const response = await axios.get<Road[]>(`${AppURL}/api/roads/bydate/get`, {
-                params: {
-                    date,
-                    dsp_code: user.dsp_code, // Ajout de dsp_code
-                },
-            });
+      try {
+        setIsLoading(true); // Affiche un indicateur de chargement
+        const response = await axios.get<Road[]>(`${AppURL}/api/roads/bydate/get`, {
+          params: {
+            date,
+            dsp_code: user.dsp_code, // Ajout de dsp_code
+          },
+        });
 
-            if (response.data && response.data.length > 0) {
-                setRoads(response.data); // Met à jour les routes récupérées
-            } else {
-                setRoads([]); // Aucune route trouvée
-            }
-        } catch (err: unknown) {
-            // Gestion explicite des erreurs 404
-            if (axios.isAxiosError(err) && err.response?.status === 404) {
-                setRoads([]); // Réinitialise à une liste vide
-            } else {
-                // Affiche uniquement les autres erreurs
-                const errorMessage = err instanceof Error ? err.message : String(err);
-            }
-        } finally {
-            setIsLoading(false); // Arrête l'indicateur de chargement
+        if (response.data && response.data.length > 0) {
+          setRoads(response.data); // Met à jour les routes récupérées
+        } else {
+          setRoads([]); // Aucune route trouvée
         }
+      } catch (err: unknown) {
+        // Gestion explicite des erreurs 404
+        if (axios.isAxiosError(err) && err.response?.status === 404) {
+          setRoads([]); // Réinitialise à une liste vide
+        } else {
+          // Affiche uniquement les autres erreurs
+          const errorMessage = err instanceof Error ? err.message : String(err);
+        }
+      } finally {
+        setIsLoading(false); // Arrête l'indicateur de chargement
+      }
     };
 
     const currentDate = selectedDate.toISOString().split('T')[0]; // Formate la date au format AAAA-MM-JJ
     if (currentDate) {
-        fetchRoadsByDate(currentDate); // Appelle la fonction avec la date sélectionnée
+      fetchRoadsByDate(currentDate); // Appelle la fonction avec la date sélectionnée
     }
-}, [selectedDate, user.dsp_code]); // Ajout de `user.dsp_code` comme dépendance
+  }, [selectedDate, user.dsp_code]); // Ajout de `user.dsp_code` comme dépendance
 
+  const fetchRoadReactions = async (roadId: string) => {
+    try {
+      const response = await axios.get<Road>(`${AppURL}/api/roads/${roadId}`, {
+        params: {
+          dsp_code: user.dsp_code, // Ajout de dsp_code pour sécuriser la requête
+        },
+      });
+      // Mettre à jour la route sélectionnée avec les nouvelles réactions
+      setSelectedRoad(response.data);
+    } catch (err) {
+      console.error('Error fetching road reactions:', err);
+    }
+  };
 
 
 
@@ -248,12 +261,14 @@ const ExtratRoutes = () => {
               {/* Bouton Reactions */}
               <TouchableOpacity
                 style={styles.reactionsButton}
-                onPress={() => {
+                onPress={async () => {
                   setSelectedRoad(item);
+                  await fetchRoadReactions(item._id); // Récupère et met à jour les réactions avant de continuer
                   setEditModalVisible(false); // Assurez-vous de fermer d'autres modals
                   setReactionsModalVisible(true); // Ouvre le modal des réactions
                 }}
               >
+
                 <Text style={styles.reactionsButtonText}>
                   {user.language === 'English' ? 'Reactions' : 'Réactions'}
                 </Text>

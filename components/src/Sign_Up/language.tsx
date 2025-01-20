@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
+import PickerModal from '../PickerModal';
+
 
 interface PseudoProps {
   inputstate: {
@@ -41,15 +42,15 @@ const Language: React.FC<PseudoProps> = ({ inputstate, setinputstate, showValida
   return (
     <View style={styles.container}>
       <Text style={styles.label}>Language:</Text>
-      <Picker
+      <PickerModal
+        title={'Select a Language'}
+        options={[
+          { label: 'English', value: 'English' },
+          { label: 'Français', value: 'Français' },
+        ]}
         selectedValue={inputstate.Language}
         onValueChange={(value) => setinputstate({ ...inputstate, Language: value })}
-        style={styles.picker}
-      >
-        <Picker.Item label="Select a language" value="" />
-        <Picker.Item label="English" value="English" />
-        <Picker.Item label="Français" value="Français" />
-      </Picker>
+      />
       {showValidation.Language && (
         <Text style={styles.errorText}>Please select a language.</Text>
       )}

@@ -992,7 +992,7 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    minHeight: 40,
+    minHeight: 75,
     maxHeight: 100,
     borderColor: '#ffffff',
     borderWidth: 1,

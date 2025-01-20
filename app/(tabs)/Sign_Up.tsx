@@ -14,6 +14,8 @@ import { useNavigation } from '@react-navigation/native';
 import axios from 'axios';
 import * as Notifications from 'expo-notifications';
 import AppURL from '@/components/src/URL';
+import app from '../../firebaseConfig'; // Importez Firebase
+
 
 type Sign_UpScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Sign_Up'>;
 
@@ -44,42 +46,67 @@ const Sign_Up: React.FC = () => {
   const [successMessage, setSuccessMessage] = useState('');
   const [serverError, setServerError] = useState('');
 
-  
+
   const registerForPushNotificationsAsync = async () => {
     let token;
 
-    // Request permissions for notifications
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
+    console.log('Starting push notification registration process...');
 
-    // Ask for permissions if not already granted
-    if (existingStatus !== 'granted') {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
-    }
-
-    // If permissions are not granted, exit
-    if (finalStatus !== 'granted') {
-      Alert.alert('Failed to get push token for push notifications!');
+    if (!app) {
+      console.error('Firebase is not initialized!');
+      Alert.alert('Firebase is not ready. Please try again later.');
       return null;
     }
 
-    // Get the push token for iOS or Android
-    token = (await Notifications.getExpoPushTokenAsync()).data;
+    try {
+      // Request permissions for notifications
+      console.log('Requesting notification permissions...');
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      console.log('Existing notification permission status:', existingStatus);
 
-    // Configure notification channel for Android
-    if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync('default', {
-        name: 'default',
-        importance: Notifications.AndroidImportance.MAX,
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#FF231F7C',
-      });
+      let finalStatus = existingStatus;
+
+      // Ask for permissions if not already granted
+      if (existingStatus !== 'granted') {
+        console.log('Permissions not granted, requesting again...');
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+        console.log('Updated notification permission status:', finalStatus);
+      }
+
+      // If permissions are not granted, exit
+      if (finalStatus !== 'granted') {
+        console.error('Notification permissions were not granted.');
+        Alert.alert('Failed to get push token for push notifications!');
+        return null;
+      }
+
+      // Get the push token for iOS or Android
+      console.log('Getting push token for the device...');
+      token = (await Notifications.getExpoPushTokenAsync()).data;
+      console.log('Expo Push Token retrieved:', token);
+
+      // Configure notification channel for Android
+      if (Platform.OS === 'android') {
+        console.log('Setting up Android notification channel...');
+        await Notifications.setNotificationChannelAsync('default', {
+          name: 'default',
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#FF231F7C',
+        });
+        console.log('Android notification channel configured.');
+      }
+    } catch (error) {
+      console.error('Error during push notification registration:', error);
+      Alert.alert('An error occurred during push notification setup.');
+      return null;
     }
 
-    console.log('Expo Push Token:', token);
+    console.log('Push notification registration process completed successfully.');
     return token;
   };
+
 
   const checkvalidation = () => {
     const AreValide = {
@@ -92,9 +119,9 @@ const Sign_Up: React.FC = () => {
       Language: inputstate.Language.length > 0,
       Dsp_Code: inputstate.Dsp_Code.length === 5,
     };
-  
+
     console.log('Validation Results:', AreValide);
-  
+
     setshowvalidation({
       name: !AreValide.name,
       familyName: !AreValide.familyName,
@@ -105,10 +132,10 @@ const Sign_Up: React.FC = () => {
       Language: !AreValide.Language,
       Dsp_Code: !AreValide.Dsp_Code,
     });
-  
+
     return Object.values(AreValide).every((valid) => valid);
   };
-  
+
 
   const handleSubmit = async () => {
     console.log('Submit clicked');
@@ -118,7 +145,7 @@ const Sign_Up: React.FC = () => {
       return;
     }
 
-    
+
     let expoPushToken = null;
 
     // Récupérer le token uniquement si la plateforme n'est pas 'web'
@@ -129,7 +156,7 @@ const Sign_Up: React.FC = () => {
         return;
       }
     }
-  
+
 
     const nouvelUtilisateur = {
       name: inputstate.name,
@@ -138,7 +165,7 @@ const Sign_Up: React.FC = () => {
       email: inputstate.email.toLowerCase(), // Convert email to lowercase
       password: inputstate.password,
       language: inputstate.Language, // Added Language
-      dsp_code: inputstate.Dsp_Code, // Added Dsp_Code
+      dsp_code: inputstate.Dsp_Code.toLowerCase(), // Added Dsp_Code
       role: 'driver',
       scoreCard: 'New DA',
       expoPushToken,
@@ -162,7 +189,7 @@ const Sign_Up: React.FC = () => {
         console.log('Unknown Error:', error);
         setServerError('An unexpected error occurred. Please try again.');
       }
-    }    
+    }
   };
 
 

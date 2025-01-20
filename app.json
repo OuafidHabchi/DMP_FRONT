@@ -17,12 +17,25 @@
       "infoPlist": {
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
-        }
+        },
+        "UIBackgroundModes": [
+          "remote-notification"
+        ],
+        "FirebaseAppDelegateProxyEnabled": false,
+        "NSPushNotificationsUsageDescription": "Nous utilisons les notifications pour vous informer des mises à jour importantes."
       },
       "bundleIdentifier": "com.primelogistique.app"
     },
     "android": {
       "package": "com.primelogistique.app",
+      "permissions": [
+        "android.permission.INTERNET",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "com.google.android.c2dm.permission.RECEIVE",
+        "android.permission.VIBRATE",
+        "android.permission.POST_NOTIFICATIONS"
+      ],
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/Log.png",
         "backgroundColor": "#001933"

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "844673146153",
+    "project_id": "prime-8e0be",
+    "storage_bucket": "prime-8e0be.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:844673146153:android:a1bdb06e3a7b69d719eb38",
+        "android_client_info": {
+          "package_name": "com.primelogistique.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBDSo8MWRPqwLJjswD4k2Cbw8wsMrP6SCE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
