@@ -59,6 +59,7 @@ yarn-error.*
 google-services.json
 GoogleService-Info.plist
 primelogistiques-firebase-adminsdk-*.json
+primelogistiques-firebase-adminsdk-fbsvc-c29ed9c255.json
 
 # Fichier de configuration Expo
 eas.json
