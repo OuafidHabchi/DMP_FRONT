@@ -9,15 +9,19 @@ import {
     StyleSheet,
     Pressable,
     Alert,
+    ActivityIndicator,
+    Platform,
 } from 'react-native';
 import PickerModal from '@/components/src/PickerModal';
 import axios from 'axios';
 import AppURL from './URL';
+import { useUser } from '@/context/UserContext';
+
 
 
 // Définir le type Template
 type Template = {
-    _id:string;
+    _id: string;
     type: string;
     raison: string;
     description: string;
@@ -28,36 +32,43 @@ type Template = {
 type TemplateManagerProps = {
     isVisible: boolean;
     onClose: () => void;
-    dsp_code: string;
-    language: string;
+    dsp_code?: string;
+    language?: string;
 };
 
 const TemplateManager: React.FC<TemplateManagerProps> = ({ isVisible, onClose, dsp_code, language }) => {
+    const { user, loadingContext } = useUser(); // ✅ Récupérer l'utilisateur depuis le contexte
     const [templates, setTemplates] = useState<Template[]>([]);
     const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [newTemplate, setNewTemplate] = useState<Template | null>(null);
+    const [isLoading, setIsLoading] = useState<boolean>(true);
+
 
 
 
     const fetchTemplates = async () => {
         try {
+            setIsLoading(true); // ✅ Affiche le loading au début
             const response = await axios.get(`${AppURL}/api/warnings/wornings/templates/get?dsp_code=${dsp_code}`);
             setTemplates(response.data);
         } catch (error) {
             console.error('Error fetching templates:', error);
             Alert.alert('Erreur', 'Impossible de récupérer les modèles.');
+        } finally {
+            setIsLoading(false); // ✅ Cache le loading une fois terminé
         }
     };
+
 
     useEffect(() => {
         if (isVisible) {
             fetchTemplates();
         }
     }, [isVisible]);
-    
+
 
     // Ajouter un nouveau modèle
     const addTemplate = async () => {
@@ -65,8 +76,7 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({ isVisible, onClose, d
             newTemplate &&
             newTemplate.type &&
             newTemplate.raison &&
-            newTemplate.description &&
-            newTemplate.severity
+            newTemplate.description
         ) {
             try {
                 // Add the "template" attribute to the newTemplate object
@@ -74,7 +84,8 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({ isVisible, onClose, d
 
                 const response = await axios.post(
                     `${AppURL}/api/warnings/wornings?dsp_code=${dsp_code}`,
-                    templateData
+                    templateData,
+
                 );
                 if (response.data) {
                     setTemplates((prev) => [...prev, response.data]);
@@ -84,9 +95,18 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({ isVisible, onClose, d
             } catch (error) {
                 console.error('Error creating template:', error);
                 Alert.alert('Erreur', 'Impossible de créer le modèle.');
+                window.alert('Impossible de créer le modèle.');
             }
         } else {
-            Alert.alert('Erreur', 'Veuillez remplir tous les champs requis.');
+            Alert.alert(
+                user?.language === 'English' ? 'Error' : 'Erreur',
+                user?.language === 'English' ? 'Please fill in all required fields.' : 'Veuillez remplir tous les champs requis.'
+            );
+
+            window.alert(
+                user?.language === 'English' ? 'Please fill in all required fields.' : 'Veuillez remplir tous les champs requis.'
+            );
+
         }
     };
 
@@ -100,7 +120,6 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({ isVisible, onClose, d
                     selectedTemplate
                 );
                 if (response.data) {
-                    console.log("Update successful:", response.data);
                     setTemplates((prev) =>
                         prev.map((template) =>
                             template._id === selectedTemplate._id ? response.data : template
@@ -111,37 +130,80 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({ isVisible, onClose, d
                 }
             } catch (error) {
                 console.error('Error updating template:', error);
-                Alert.alert(
-                    'Erreur',
-                    "Erreur lors de la mise à jour du modèle. Veuillez réessayer."
-                );
             }
         } else {
             Alert.alert(
-                'Erreur',
-                'Modèle sélectionné invalide ou ID manquant. Veuillez réessayer.'
+                user?.language === 'English' ? 'Error' : 'Erreur',
+                user?.language === 'English'
+                    ? 'Invalid selected template . Please try again.'
+                    : 'Modèle sélectionné invalide . Veuillez réessayer.'
             );
+
         }
     };
-    
 
 
-    // Supprimer un modèle
+
     const deleteTemplate = async () => {
-        if (selectedTemplate) {
-            try {
-                await axios.delete(
-                    `${AppURL}/api/warnings/wornings/${selectedTemplate._id}?dsp_code=${dsp_code}`
-                );
-                setTemplates((prev) =>
-                    prev.filter((template) => template._id !== selectedTemplate._id)
-                );
-                setSelectedTemplate(null);
-                setShowDeleteModal(false);
-            } catch (error) {
-                console.error('Error deleting template:', error);
-                Alert.alert('Erreur', 'Impossible de supprimer le modèle.');
-            }
+        if (!selectedTemplate) return;
+
+        const confirmationMessage = user?.language === 'English'
+            ? 'Are you sure you want to delete this template?'
+            : 'Êtes-vous sûr de vouloir supprimer ce modèle ?';
+
+        const successMessage = user?.language === 'English'
+            ? 'Template deleted successfully!'
+            : 'Modèle supprimé avec succès!';
+
+        const errorMessage = user?.language === 'English'
+            ? 'Failed to delete template. Please try again later.'
+            : 'Échec de la suppression du modèle. Veuillez réessayer plus tard.';
+
+        // Confirmation pour mobile (React Native)
+        if (Platform.OS !== 'web') {
+            return Alert.alert(
+                user?.language === 'English' ? 'Confirmation' : 'Confirmation',
+                confirmationMessage,
+                [
+                    {
+                        text: user?.language === 'English' ? 'Cancel' : 'Annuler',
+                        style: 'cancel',
+                    },
+                    {
+                        text: user?.language === 'English' ? 'Delete' : 'Supprimer',
+                        onPress: async () => {
+                            await confirmDeleteTemplate(successMessage, errorMessage);
+                        },
+                        style: 'destructive',
+                    },
+                ]
+            );
+        }
+
+        // Confirmation pour le Web
+        if (window.confirm(confirmationMessage)) {
+            await confirmDeleteTemplate(successMessage, errorMessage);
+        }
+    };
+
+    // Fonction séparée pour exécuter la suppression après confirmation
+    const confirmDeleteTemplate = async (successMessage: string, errorMessage: string) => {
+        try {
+            await axios.delete(`${AppURL}/api/warnings/wornings/${selectedTemplate?._id}?dsp_code=${dsp_code}`);
+
+            // Mettre à jour la liste des modèles après suppression
+            setTemplates((prev) => prev.filter((template) => template._id !== selectedTemplate?._id));
+
+            // Réinitialiser l'état
+            setSelectedTemplate(null);
+            setShowDeleteModal(false);
+
+            // Afficher une notification de succès
+            Alert.alert('Success', successMessage);
+            window.alert(successMessage);
+        } catch (error) {
+            Alert.alert('Error', errorMessage);
+            window.alert(errorMessage);
         }
     };
 
@@ -151,30 +213,44 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({ isVisible, onClose, d
             <View style={styles.modalOverlay}>
                 <View style={styles.modalContainer}>
                     <ScrollView contentContainerStyle={styles.scrollContent}>
-                        <Text style={styles.title}>Gérer les modèles</Text>
+                        <Text style={styles.title}>
+                            {user?.language === 'English' ? 'Manage Templates' : 'Gérer les modèles'}
+                        </Text>
 
                         {/* Liste des modèles */}
-                        {templates.map((template) => (
-                            <TouchableOpacity
-                                key={template._id}
-                                style={styles.templateItem}
-                                onPress={() => {
-                                    setSelectedTemplate(template);
-                                    setShowEditModal(true);
-                                }}
-                                onLongPress={() => {
-                                    setSelectedTemplate(template);
-                                    setShowDeleteModal(true);
-                                }}
-                            >
-                                <Text style={styles.templateType}>{template.raison}</Text>
-                                <Text style={styles.templateraison}>{template.type}</Text>
-                            </TouchableOpacity>
-                        ))}
+                        {isLoading ? (
+                            <View style={styles.loadingContainer}>
+                                <ActivityIndicator size="large" color="#001933" />
+                                <Text style={styles.loadingText}>
+                                    {user?.language === 'English' ? 'Loading templates...' : 'Chargement des modèles...'}
+                                </Text>
+                            </View>
+                        ) : (
+                            templates.map((template) => (
+                                <TouchableOpacity
+                                    key={template._id}
+                                    style={styles.templateItem}
+                                    onPress={() => {
+                                        setSelectedTemplate(template);
+                                        setShowEditModal(true);
+                                    }}
+                                    onLongPress={() => {
+                                        setSelectedTemplate(template);
+                                        setShowDeleteModal(true);
+                                    }}
+                                >
+                                    <Text style={styles.templateType}>{template.raison}</Text>
+                                    <Text style={styles.templateraison}>{template.type}</Text>
+                                </TouchableOpacity>
+                            ))
+                        )}
+
 
                         {/* Bouton Fermer */}
                         <Pressable style={styles.closeButton} onPress={onClose}>
-                            <Text style={styles.buttonText}>Fermer</Text>
+                            <Text style={styles.buttonText}>
+                                {user?.language === 'English' ? 'Close' : 'Fermer'}
+                            </Text>
                         </Pressable>
                     </ScrollView>
 
@@ -203,7 +279,9 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({ isVisible, onClose, d
                         <View style={styles.modalOverlay}>
                             <View style={styles.modalContainer}>
                                 <ScrollView contentContainerStyle={styles.scrollContent}>
-                                    <Text style={styles.formTitle}>Créer un modèle</Text>
+                                    <Text style={styles.formTitle}>
+                                        {user?.language === 'English' ? 'Create a template' : 'Créer un modèle'}
+                                    </Text>
 
                                     <PickerModal
                                         title="Type"
@@ -221,7 +299,7 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({ isVisible, onClose, d
 
                                     <TextInput
                                         style={styles.input}
-                                        placeholder="Raison"
+                                        placeholder={user?.language === 'English' ? 'Reason' : 'Raison'}
                                         value={newTemplate?.raison || ''}
                                         onChangeText={(text) =>
                                             setNewTemplate((prev) =>
@@ -240,25 +318,28 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({ isVisible, onClose, d
                                             )
                                         }
                                     />
+                                    {newTemplate.type == 'warning' && (
+                                        <PickerModal
+                                            title={user?.language === 'English' ? 'Severity' : 'Gravité'}
+                                            options={[
+                                                { label: user?.language === 'English' ? 'Low' : 'Faible', value: 'low' },
+                                                { label: user?.language === 'English' ? 'Medium' : 'Moyenne', value: 'medium' },
+                                                { label: user?.language === 'English' ? 'High' : 'Élevée', value: 'high' },
+                                            ]}
 
-                                    <PickerModal
-                                        title="Gravité"
-                                        options={[
-                                            { label: 'Faible', value: 'low' },
-                                            { label: 'Moyenne', value: 'medium' },
-                                            { label: 'Élevée', value: 'high' },
-                                        ]}
-                                        selectedValue={newTemplate?.severity || ''}
-                                        onValueChange={(value) =>
-                                            setNewTemplate((prev) =>
-                                                prev ? { ...prev, severity: value } : { _id: '', type: '', raison: '', description: '', severity: value, link: '' }
-                                            )
-                                        }
-                                    />
+                                            selectedValue={newTemplate?.severity || ''}
+                                            onValueChange={(value) =>
+                                                setNewTemplate((prev) =>
+                                                    prev ? { ...prev, severity: value } : { _id: '', type: '', raison: '', description: '', severity: value, link: '' }
+                                                )
+                                            }
+                                        />
+                                    )}
+
 
                                     <TextInput
                                         style={styles.input}
-                                        placeholder="Lien (optionnel)"
+                                        placeholder={user?.language === 'English' ? 'Link (optional)' : 'Lien (optionnel)'}
                                         value={newTemplate?.link || ''}
                                         onChangeText={(text) =>
                                             setNewTemplate((prev) =>
@@ -268,14 +349,18 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({ isVisible, onClose, d
                                     />
 
                                     <TouchableOpacity style={styles.saveButton} onPress={addTemplate}>
-                                        <Text style={styles.buttonText}>Enregistrer</Text>
+                                        <Text style={styles.buttonText}>
+                                            {user?.language === 'English' ? 'Save' : 'Enregistrer'}
+                                        </Text>
                                     </TouchableOpacity>
 
                                     <Pressable
                                         style={styles.closeButton}
                                         onPress={() => setShowCreateModal(false)}
                                     >
-                                        <Text style={styles.buttonText}>Annuler</Text>
+                                        <Text style={styles.buttonText}>
+                                            {user?.language === 'English' ? 'Cancel' : 'Annuler'}
+                                        </Text>
                                     </Pressable>
                                 </ScrollView>
                             </View>
@@ -288,7 +373,9 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({ isVisible, onClose, d
                         <View style={styles.modalOverlay}>
                             <View style={styles.modalContainer}>
                                 <ScrollView contentContainerStyle={styles.scrollContent}>
-                                    <Text style={styles.formTitle}>Modifier le modèle</Text>
+                                    <Text style={styles.formTitle}>
+                                        {user?.language === 'English' ? 'Edit Template' : 'Modifier le modèle'}
+                                    </Text>
 
                                     <PickerModal
                                         title="Type"
@@ -306,7 +393,7 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({ isVisible, onClose, d
 
                                     <TextInput
                                         style={styles.input}
-                                        placeholder="Raison"
+                                        placeholder={user?.language === 'English' ? 'Reason' : 'Raison'}
                                         value={selectedTemplate?.raison || ''}
                                         onChangeText={(text) =>
                                             setSelectedTemplate((prev) =>
@@ -325,25 +412,28 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({ isVisible, onClose, d
                                             )
                                         }
                                     />
+                                    {selectedTemplate.type == "warning" && (
+                                        <PickerModal
+                                            title={user?.language === 'English' ? 'Severity' : 'Gravité'}
+                                            options={[
+                                                { label: user?.language === 'English' ? 'Low' : 'Faible', value: 'low' },
+                                                { label: user?.language === 'English' ? 'Medium' : 'Moyenne', value: 'medium' },
+                                                { label: user?.language === 'English' ? 'High' : 'Élevée', value: 'high' },
+                                            ]}
+                                            selectedValue={selectedTemplate?.severity || ''}
+                                            onValueChange={(value) =>
+                                                setSelectedTemplate((prev) =>
+                                                    prev ? { ...prev, severity: value } : null
+                                                )
+                                            }
+                                        />
 
-                                    <PickerModal
-                                        title="Gravité"
-                                        options={[
-                                            { label: 'Faible', value: 'low' },
-                                            { label: 'Moyenne', value: 'medium' },
-                                            { label: 'Élevée', value: 'high' },
-                                        ]}
-                                        selectedValue={selectedTemplate?.severity || ''}
-                                        onValueChange={(value) =>
-                                            setSelectedTemplate((prev) =>
-                                                prev ? { ...prev, severity: value } : null
-                                            )
-                                        }
-                                    />
+                                    )}
+
 
                                     <TextInput
                                         style={styles.input}
-                                        placeholder="Lien (optionnel)"
+                                        placeholder={user?.language === 'English' ? 'Link (optional)' : 'Lien (optionnel)'}
                                         value={selectedTemplate?.link || ''}
                                         onChangeText={(text) =>
                                             setSelectedTemplate((prev) =>
@@ -353,21 +443,27 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({ isVisible, onClose, d
                                     />
 
                                     <TouchableOpacity style={styles.saveButton} onPress={updateTemplate}>
-                                        <Text style={styles.buttonText}>Enregistrer</Text>
+                                        <Text style={styles.buttonText}>
+                                            {user?.language === 'English' ? 'Save' : 'Enregistrer'}
+                                        </Text>
                                     </TouchableOpacity>
 
                                     <TouchableOpacity
                                         style={[styles.saveButton, { backgroundColor: '#e74c3c' }]}
                                         onPress={deleteTemplate}
                                     >
-                                        <Text style={styles.buttonText}>Supprimer</Text>
+                                        <Text style={styles.buttonText}>
+                                            {user?.language === 'English' ? 'Delete' : 'Supprimer'}
+                                        </Text>
                                     </TouchableOpacity>
 
                                     <Pressable
                                         style={styles.closeButton}
                                         onPress={() => setShowEditModal(false)}
                                     >
-                                        <Text style={styles.buttonText}>Annuler</Text>
+                                        <Text style={styles.buttonText}>
+                                            {user?.language === 'English' ? 'Cancel' : 'Annuler'}
+                                        </Text>
                                     </Pressable>
                                 </ScrollView>
                             </View>
@@ -384,6 +480,18 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({ isVisible, onClose, d
 export default TemplateManager;
 
 const styles = StyleSheet.create({
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginVertical: 20,
+    },
+    loadingText: {
+        marginTop: 10,
+        fontSize: 16,
+        color: '#001933',
+        fontWeight: 'bold',
+    },
     textArea: {
         height: 190,
         textAlignVertical: 'top',

@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import axios from 'axios';
 import AppURL from './URL';
-import AsyncStorage from '@react-native-async-storage/async-storage'; // Import AsyncStorage
+import { useUser } from '@/context/UserContext';
 
 
 interface EquipmentUpdate {
@@ -39,7 +39,7 @@ interface TimeCard {
 interface EquipmentUpdatesModalProps {
     day: string;
     photoType: string;
-    dspCode: string;
+    dspCode?: string;
     onClose: () => void;
 }
 
@@ -56,6 +56,8 @@ const EquipmentUpdatesModal: React.FC<EquipmentUpdatesModalProps> = ({
     const [isImageModalVisible, setIsImageModalVisible] = useState(false);
     const [imageLoading, setImageLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState<string>(''); // État pour la recherche
+    const { user, loadingContext } = useUser(); // ✅ Récupérer l'utilisateur depuis le contexte
+
 
 
     useEffect(() => {
@@ -124,7 +126,11 @@ const EquipmentUpdatesModal: React.FC<EquipmentUpdatesModalProps> = ({
                 {hasPhoto && (
                     <Text style={styles.photoDetails}>{`Van: ${update!.vanName}, Time: ${update!.localTime}`}</Text>
                 )}
-                {!hasPhoto && <Text style={styles.noPhotoText}>No photo uploaded</Text>}
+                {!hasPhoto &&
+                    <Text style={styles.noPhotoText}>
+                        {user?.language === 'English' ? 'No photo uploaded' : 'Aucune photo téléchargée'}
+                    </Text>
+                }
             </TouchableOpacity>
         );
     };
@@ -133,22 +139,30 @@ const EquipmentUpdatesModal: React.FC<EquipmentUpdatesModalProps> = ({
         return (
             <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#001933" />
-                <Text style={styles.loadingText}>Loading...</Text>
+                <Text style={styles.loadingText}>
+                    {user?.language === 'English' ? 'Loading...' : 'Chargement...'}
+                </Text>
             </View>
         );
     }
 
     return (
         <View style={styles.container}>
-            <Text style={styles.title}>Equipment - {day} ({photoType})</Text>
-            <TextInput
-                style={styles.searchBar}
-                placeholder="Search employees..."
-                placeholderTextColor="#ccc"
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-            />
+            <Text style={styles.title}>
+                {user?.language === 'English'
+                    ? `Equipment - ${day}`
+                    : `Équipement - ${day}`}
+            </Text>
 
+            <View style={styles.searchBarContainer}>
+                <TextInput
+                    style={styles.searchBar}
+                    placeholder={user?.language === 'English' ? ' 🔍 Search employees...' : ' 🔍 Rechercher des employés...'}
+                    placeholderTextColor="#ccc"
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                />
+            </View>
             <FlatList
                 data={employees.filter((employee) =>
                     `${employee.name} ${employee.familyName}`
@@ -161,7 +175,9 @@ const EquipmentUpdatesModal: React.FC<EquipmentUpdatesModalProps> = ({
 
 
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                <Text style={styles.closeButtonText}>Close</Text>
+                <Text style={styles.closeButtonText}>
+                    {user?.language === 'English' ? 'Close' : 'Fermer'}
+                </Text>
             </TouchableOpacity>
 
             <Modal visible={isImageModalVisible} animationType="fade" transparent={true}>
@@ -170,7 +186,9 @@ const EquipmentUpdatesModal: React.FC<EquipmentUpdatesModalProps> = ({
                         style={styles.modalCloseButton}
                         onPress={() => setIsImageModalVisible(false)}
                     >
-                        <Text style={styles.closeButtonText}>Close</Text>
+                        <Text style={styles.closeButtonText}>
+                            {user?.language === 'English' ? 'Close' : 'Fermer'}
+                        </Text>
                     </TouchableOpacity>
                     {selectedImage && (
                         <>
@@ -193,21 +211,20 @@ const EquipmentUpdatesModal: React.FC<EquipmentUpdatesModalProps> = ({
 
 const styles = StyleSheet.create({
 
+    searchBarContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 16,
+    },
     searchBar: {
-        backgroundColor: '#ffffff',
-        borderRadius: 12,
-        paddingHorizontal: 16,
-        marginBottom: 20,
-        height: 50,
+        flex: 1,
+        backgroundColor: '#f0f0f0', // Gris clair pour contraste léger sur fond blanc
+        borderRadius: 8,
+        paddingHorizontal: 8,
+        marginRight: 10,
+        height: 40,
+        borderColor: '#001933', // Bordure bleu foncé
         borderWidth: 1,
-        borderColor: '#001933',
-        color: '#2c3e50',
-        fontSize: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 2,
     },
     container: {
         flex: 1,

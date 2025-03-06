@@ -23,7 +23,7 @@ node_modules/
 
 # Expo
 .expo/
-dist/
+.android
 web-build/
 expo-env.d.ts
 
@@ -54,3 +54,19 @@ yarn-error.*
 *.tsbuildinfo
 
 # @end expo-cli
+
+# Clés Firebase
+google-services.json
+GoogleService-Info.plist
+primelogistiques-firebase-adminsdk-*.json
+
+# Fichier de configuration Expo
+eas.json
+
+# Keystore Android
+*.jks
+
+#autre 
+assetlinks.json
+apple-app-site-association
+firebaseConfig.js

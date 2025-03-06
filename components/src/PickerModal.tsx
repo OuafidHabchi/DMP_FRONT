@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Platform, View, Text, Modal, TouchableOpacity, StyleSheet, FlatList } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
+import { useUser } from '@/context/UserContext';
+
 
 interface PickerModalProps {
   title: string; // Placeholder title
@@ -18,7 +20,7 @@ const PickerModal: React.FC<PickerModalProps> = ({
   style = {}, // Default empty object for custom styles
 }) => {
   const [isModalVisible, setModalVisible] = useState(false);
-
+  const { user, loadingContext } = useUser(); // ✅ Récupérer l'utilisateur depuis le contexte
   const handleOptionSelect = (value: string) => {
     onValueChange(value);
     setModalVisible(false); // Close modal after selection
@@ -77,7 +79,7 @@ const PickerModal: React.FC<PickerModalProps> = ({
                   onPress={() => setModalVisible(false)}
                 >
                   <Text style={styles.modalCloseButtonText}>
-                    {Platform.OS === 'ios' ? 'Close' : 'Cancel'}
+                    {user?.language === 'English' ? 'Close' : 'Fermer'}
                   </Text>
                 </TouchableOpacity>
               </View>

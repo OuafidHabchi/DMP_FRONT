@@ -10,7 +10,6 @@ interface PseudoProps {
     password: string;
     confirmation: string;
     Language: string,
-    Dsp_Code: string,
   };
   setinputstate: React.Dispatch<
     React.SetStateAction<{
@@ -21,7 +20,6 @@ interface PseudoProps {
       password: string;
       confirmation: string;
       Language: string,
-      Dsp_Code: string,
     }>
   >;
   showValidation: {
@@ -32,7 +30,6 @@ interface PseudoProps {
     password: boolean;
     confirmation: boolean;
     Language: boolean,
-    Dsp_Code: boolean,
   };
 }
 

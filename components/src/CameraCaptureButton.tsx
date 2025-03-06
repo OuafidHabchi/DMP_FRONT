@@ -1,17 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { View, TouchableOpacity, Text, Image, StyleSheet, Alert } from 'react-native';
+import { View, TouchableOpacity, Text, Image, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
-import AppURL from '@/components/src/URL'; // Assurez-vous que cette URL est correcte pour ton API
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import AppURL from '@/components/src/URL';
 
 interface CameraCaptureButtonProps {
-  employeeName: string;
-  employeeFamilyName: string;
-  vanName: string;
-  dspCode: string;
-  userId: string; // Ajout du userId
-  photoType: 'prepic' | 'postpic'; // Ajout du type de photo (prepic ou postpic)
-  onSuccess: () => void; // Ajout de la fonction de succès pour fermer le modal
+  employeeName?: string;
+  employeeFamilyName?: string;
+  vanName?: string;
+  dspCode?: string;
+  userId?: string;
+  photoType: 'prepic' | 'postpic';
+  onSuccess: () => void;
 }
 
 const CameraCaptureButton: React.FC<CameraCaptureButtonProps> = ({
@@ -19,13 +20,14 @@ const CameraCaptureButton: React.FC<CameraCaptureButtonProps> = ({
   employeeFamilyName,
   vanName,
   dspCode,
-  userId, // Passer le userId en prop
-  photoType, // Passer le photoType en prop (prepic ou postpic)
-  onSuccess, // Ajoutez onSuccess
+  userId,
+  photoType,
+  onSuccess,
 }) => {
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
-  // Fonction pour ouvrir directement la caméra et prendre une photo
+  // ✅ Fonction pour ouvrir la caméra
   const openCamera = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
@@ -36,101 +38,123 @@ const CameraCaptureButton: React.FC<CameraCaptureButtonProps> = ({
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
-      quality: 1, // Utiliser la qualité maximale pour un traitement ultérieur
+      quality: 1,
     });
 
-    if (!result.canceled) {
+    if (!result.canceled && result.assets?.length > 0) {
+      // ✅ Compression de l’image
       const manipulatedImage = await ImageManipulator.manipulateAsync(
         result.assets[0].uri,
-        [{ resize: { width: 400 } }], // Redimensionner l'image à une largeur de 800px
-        { compress: 0.2, format: ImageManipulator.SaveFormat.JPEG } // Compression à 50% de la qualité
+        [{ resize: { width: 400 } }],
+        { compress: 0.5, format: ImageManipulator.SaveFormat.JPEG }
       );
       setCapturedPhoto(manipulatedImage.uri);
     }
   };
 
-  // Fonction pour envoyer la photo capturée et les données associées
+  // ✅ Fonction pour envoyer l'image au serveur
   const sendCapturedImage = async (uri: string) => {
-    if (!uri) {
-      Alert.alert('No photo', 'Please take a photo first.');
-      return;
-    }
+    setIsUploading(true);
 
     const formData = new FormData();
     const uriParts = uri.split('.');
-    const fileType = uriParts[uriParts.length - 1]; // Get the file type (extension)
+    const fileType = uriParts[uriParts.length - 1];
 
-    // Créer un objet File à partir de l'URI de l'image
-    const file = {
+    formData.append('image', {
       uri: uri,
       name: `photo-${Date.now()}.${fileType}`,
-      type: `image/${fileType === 'jpg' ? 'jpeg' : fileType}`, // Utilisation du type approprié
-    } as any;
+      type: `image/${fileType === 'jpg' ? 'jpeg' : fileType}`,
+    } as any);
 
-    // Ajouter de l'image à formData
-    formData.append('image', file);
-    // Ajouter les informations supplémentaires
-    formData.append('employeeName', `${employeeName} ${employeeFamilyName}`);
-    formData.append('vanName', vanName);
-    formData.append('dsp_code', dspCode);
-    formData.append('userId', userId); // Ajout du userId
-    formData.append('photoType', photoType); // Ajouter le type de photo (prepic ou postpic)
+    formData.append('employeeName', `${employeeName ?? ''} ${employeeFamilyName ?? ''}`);
+    formData.append('vanName', vanName ?? '');
+    formData.append('dsp_code', dspCode ?? '');
+    formData.append('userId', userId ?? '');
+    formData.append('photoType', photoType);
 
-  const currentDay = new Date().toDateString(); // Ajout de la date actuelle au format souhaité
-
+    const currentDay = new Date().toDateString();
     const currentTime = new Date().toLocaleTimeString('en-GB', {
       hour: '2-digit',
       minute: '2-digit',
       hour12: false,
     });
 
-    formData.append('localTime', currentTime); // Ajout de l'heure actuelle au format HH:mm
-    formData.append('day', currentDay); // Ajout de la date au format "Sat Dec 28 2024"
+    formData.append('localTime', currentTime);
+    formData.append('day', currentDay);
 
     try {
-      const response = await fetch(`${AppURL}/api/equipment-update/equipment-updates?dsp_code=${dspCode}`, {
-        method: 'POST',
-        body: formData,
-        headers: {
-          'Content-Type': 'multipart/form-data', // Assurez-vous que c'est bien set
-        },
-      });
+      const response = await fetch(
+        `${AppURL}/api/equipment-update/equipment-updates?dsp_code=${dspCode}`,
+        {
+          method: 'POST',
+          body: formData,
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      );
 
       if (response.ok) {
-        Alert.alert('Success', 'Image uploaded successfully');
-        setCapturedPhoto(null); // Clear the captured photo
-        onSuccess(); // Appeler onSuccess pour fermer le modal
+        Alert.alert('Success', 'Photo sent successfully!');
+        
+        // ✅ Mettre à jour AsyncStorage selon le type de photo
+        if (photoType === 'prepic') {
+          await AsyncStorage.setItem('prepic', 'false');
+          await AsyncStorage.setItem('postpic', 'true');
+        } else if (photoType === 'postpic') {
+          await AsyncStorage.setItem('postpic', 'false');
+          await AsyncStorage.setItem('prepic', 'false');
+        }
+
+        // ✅ Appeler immédiatement la fonction de succès
+        onSuccess();
+
+        // ✅ Effacer la photo de l’état
+        setCapturedPhoto(null);
       } else {
-        const errorMessage = await response.text();
-        Alert.alert('Error', errorMessage);
+        const errorText = await response.text();
+        Alert.alert('Error', `Failed to send photo: ${errorText}`);
       }
     } catch (error) {
-      console.error('Error uploading image:', error);
-      Alert.alert('Error', 'Failed to upload the image');
+      console.error('Upload error:', error);
+      Alert.alert('Error', 'Network error, please try again.');
+    } finally {
+      setIsUploading(false);
     }
   };
 
-  // Utiliser useEffect pour ouvrir la caméra immédiatement au montage
   useEffect(() => {
-    openCamera();
+    openCamera(); // ✅ Ouvrir automatiquement la caméra dès que le composant se monte
   }, []);
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity onPress={openCamera} style={styles.button}>
-        <Text style={styles.buttonText}>Take Photo</Text>
-      </TouchableOpacity>
+      {isUploading ? (
+        <ActivityIndicator size="large" color="#001933" />
+      ) : (
+        <>
+          {capturedPhoto && (
+            <View style={styles.photoPreviewContainer}>
+              <Image source={{ uri: capturedPhoto }} style={styles.photoPreview} />
+            </View>
+          )}
 
-      {capturedPhoto && (
-        <View style={styles.photoPreviewContainer}>
-          <Image source={{ uri: capturedPhoto }} style={styles.photoPreview} />
-        </View>
-      )}
+          <TouchableOpacity onPress={openCamera} style={styles.button}>
+            <Text style={styles.buttonText}>Retake Photo</Text>
+          </TouchableOpacity>
 
-      {capturedPhoto && (
-        <TouchableOpacity onPress={() => sendCapturedImage(capturedPhoto)} style={styles.submitButton}>
-          <Text style={styles.buttonText}>Submit</Text>
-        </TouchableOpacity>
+          {capturedPhoto && (
+            <TouchableOpacity
+              onPress={() => sendCapturedImage(capturedPhoto)}
+              style={styles.submitButton}
+              disabled={isUploading}
+            >
+              <Text style={styles.buttonText}>
+                {isUploading ? 'Uploading...' : 'Submit Photo'}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </>
       )}
     </View>
   );
@@ -141,38 +165,39 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
     backgroundColor: '#F5F5F5',
   },
   button: {
     backgroundColor: '#dc3545',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 25,
     borderRadius: 8,
-    marginBottom: 20,
+    marginVertical: 10,
   },
   submitButton: {
     backgroundColor: '#001933',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 25,
     borderRadius: 8,
-    marginTop: 20,
+    marginVertical: 10,
   },
   buttonText: {
-    color: 'white',
+    color: '#FFF',
     fontWeight: 'bold',
     fontSize: 16,
     textAlign: 'center',
   },
   photoPreviewContainer: {
+    marginVertical: 20,
     alignItems: 'center',
-    marginTop: 20,
   },
   photoPreview: {
-    width: 200,
-    height: 200,
+    width: 250,
+    height: 250,
     borderRadius: 10,
-    borderWidth: 2,
     borderColor: '#DDD',
+    borderWidth: 2,
   },
 });
 
