@@ -1,0 +1,71 @@
+npm install @react-navigation/stack
+npm install @react-navigation/native
+npm install @react-navigation/native-stack
+npm install react-native-screens react-native-safe-area-context
+npm install react-native-gesture-handler react-native-reanimated react-native-screens react-native-safe-area-context @react-native-community/masked-view
+npm install axios
+# npm install @react-navigation/native @react-navigation/material-top-tabs
+npm install @react-navigation/native @react-navigation/bottom-tabs
+npm install @react-native-picker/picker
+npm install @react-native-community/datetimepicker
+npm install react-datetime
+npm install @react-native-firebase/app @react-native-firebase/firestore
+expo install firebase
+npm install react-native-gesture-handler react-native-reanimated react-native-screens react-native-safe-area-context @react-native-community/masked-view
+npm install @react-navigation/drawer
+npm install @types/react-native-reanimated @types/react-native-screens @types/react-native-safe-area-context --save-dev
+npm install moment-timezone
+npm install --save-dev @types/moment-timezone
+npm install --save-dev @types/react-native-vector-icons
+npm install socket.io-client
+npm install --save-dev @types/socket.io-client
+npm install papaparse
+npm install react-native-document-picker
+expo install expo-permissions
+expo install expo-notifications
+expo install expo-image-picker
+npm install react-native-hyperlink
+expo install react-native-qrcode-svg
+npm install react-native-autolink
+npm install react-native-image-zoom-viewer react-native-modal
+expo install expo-av
+npm install react-native-pdf
+npm install react-native-calendars
+npm install react-native-chart-kit
+npm install react-native-dropdown-picker
+npm install --save-dev @types/react-native-dropdown-picker
+npm install react-native-svg-charts react-native-svg
+npm install react-native-chart-kit@latest react-native-gesture-handler@latest expo-router@latest
+npm install @nivo/bar @nivo/pie @nivo/line
+npm install react-native-tab-view react-native-gesture-handler react-native-reanimated react-native-screens react-native-safe-area-context
+expo install expo-clipboard
+npm install react-native-picker-select
+npm install @react-native-async-storage/async-storage
+npm install expo expo-modules-core --save
+npm install react-native-html-to-pdf
+npm install jspdf
+npm install expo-sharing 
+npm install react-native-markdown-display
+expo install expo-image-manipulator
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

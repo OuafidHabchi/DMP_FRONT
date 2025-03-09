@@ -1,0 +1,84 @@
+{
+  "expo": {
+    "name": "Opex Logistics",
+    "slug": "Opex-Logistics",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/opex_android.png",
+    "scheme": "myapp",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/images/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#001933"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.opexlogistics.app",
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        },
+        "UIBackgroundModes": [
+          "remote-notification"
+        ],
+        "FirebaseAppDelegateProxyEnabled": false,
+        "NSPushNotificationsUsageDescription": "Nous utilisons les notifications pour vous informer des mises à jour importantes."
+      }
+    },
+    "android": {
+      "package": "com.opexlogistics.app",
+      "googleServicesFile": "./google-services.json",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/opex_android.png",
+        "backgroundColor": "#001933"
+      },
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "data": [
+            {
+              "scheme": "myapp",
+              "host": "signup"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "fallback": true,
+      "favicon": "./assets/images/opex_android.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "static"
+          }
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "newArchEnabled": true
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "6ab201ed-9a32-4138-b204-bfca48a1bc91"
+      }
+    },
+    "owner": "ouafid"
+  }
+}
